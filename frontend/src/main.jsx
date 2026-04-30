@@ -507,6 +507,7 @@ function Media({ api }) {
   const favs = useCollection(api, 'media/favorites');
   const [query, setQuery] = useState('');
   const [type, setType] = useState('movie');
+  const [genre, setGenre] = useState('Alle');
   const [results, setResults] = useState([]);
 
   async function search(event) {
@@ -514,9 +515,12 @@ function Media({ api }) {
     try {
       setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=${type}`));
     } catch {
-      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.' }]);
+      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Fuer mich' }]);
     }
   }
+
+  const genres = ['Alle', ...Array.from(new Set(favs.items.flatMap((item) => (item.genres || '').split(',').map((name) => name.trim()).filter(Boolean))))];
+  const filteredFavorites = genre === 'Alle' ? favs.items : favs.items.filter((item) => (item.genres || '').split(',').map((name) => name.trim()).includes(genre));
 
   return (
     <div className="space-y-4">
@@ -530,18 +534,48 @@ function Media({ api }) {
       <div className="grid gap-4 md:grid-cols-3">
         {results.map((item) => <MediaCard key={item.externalId} item={item} onSave={() => favs.add(item)} />)}
       </div>
-      <h2 className="font-semibold">Favoriten</h2>
-      <div className="grid gap-4 md:grid-cols-3">{favs.items.map((item) => <MediaCard key={item.id} item={item} onDelete={() => favs.remove(item.id)} />)}</div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="font-semibold">Favoriten</h2>
+        <Select value={genre} onChange={(e) => setGenre(e.target.value)} className="sm:max-w-xs">{genres.map((name) => <option key={name}>{name}</option>)}</Select>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {filteredFavorites.map((item) => <MediaCard key={item.id} item={item} onDelete={() => favs.remove(item.id)} onUpdate={(patch) => favs.update(item.id, patch)} />)}
+      </div>
     </div>
   );
 }
 
-function MediaCard({ item, onSave, onDelete }) {
+function MediaCard({ item, onSave, onDelete, onUpdate }) {
+  const [open, setOpen] = useState(false);
   return (
     <Card>
-      {item.imageUrl && <img src={item.imageUrl} alt="" className="mb-3 aspect-[2/3] w-full rounded-md object-cover" />}
-      <h3 className="font-semibold">{item.title}</h3>
+      <button type="button" onClick={() => setOpen(!open)} className="block w-full text-left">
+        {item.imageUrl && <img src={item.imageUrl} alt="" className="mb-3 aspect-[2/3] w-full rounded-md object-cover" />}
+        <h3 className="font-semibold">{item.title}</h3>
+        <p className="mt-1 text-sm text-zinc-500">
+          {[item.releaseYear, item.audience, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
+        </p>
+      </button>
       <p className="mt-2 line-clamp-4 text-sm text-zinc-500">{item.description}</p>
+      {open && (
+        <div className="mt-3 space-y-2 text-sm">
+          {item.genres && <p><span className="font-medium">Genre:</span> {item.genres}</p>}
+          {item.actors && <p><span className="font-medium">Schauspieler:</span> {item.actors}</p>}
+          {item.trailerUrl && <a href={item.trailerUrl} target="_blank" rel="noreferrer" className="inline-flex text-sea underline">Trailer oeffnen</a>}
+          {onUpdate && (
+            <div className="space-y-2 pt-2">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(item.watched)} onChange={(e) => onUpdate({ watched: e.target.checked })} /> Bereits gesehen</label>
+              <Select value={item.audience || 'Fuer mich'} onChange={(e) => onUpdate({ audience: e.target.value })}>
+                <option>Fuer mich</option>
+                <option>Fuer Freundin</option>
+                <option>Fuer Familie</option>
+                <option>Fuer Brueder</option>
+                <option>Fuer Kinder</option>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
       <Button onClick={onSave || onDelete} className="mt-4">{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
     </Card>
   );

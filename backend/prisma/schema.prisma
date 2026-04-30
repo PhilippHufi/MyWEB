@@ -46,14 +46,20 @@ model GiftIdea {
 }
 
 model FavoriteMedia {
-  id          Int      @id @default(autoincrement())
-  source      String
-  externalId  String?
-  mediaType   String
-  title       String
-  imageUrl    String?
-  description String?
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  source        String
+  externalId    String?
+  mediaType     String
+  title         String
+  imageUrl      String?
+  description   String?
+  releaseYear   String?
+  genres        String?
+  actors        String?
+  trailerUrl    String?
+  watched       Boolean  @default(false)
+  audience      String   @default("Fuer mich")
+  createdAt     DateTime @default(now())
 }
 
 model NewsBookmark {

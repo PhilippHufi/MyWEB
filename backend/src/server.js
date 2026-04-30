@@ -192,7 +192,13 @@ crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   mediaType: body.mediaType || 'movie',
   title: body.title,
   imageUrl: body.imageUrl || null,
-  description: body.description || null
+  description: body.description || null,
+  releaseYear: body.releaseYear || null,
+  genres: Array.isArray(body.genres) ? body.genres.join(', ') : body.genres || null,
+  actors: Array.isArray(body.actors) ? body.actors.join(', ') : body.actors || null,
+  trailerUrl: body.trailerUrl || null,
+  watched: Boolean(body.watched),
+  audience: body.audience || 'Fuer mich'
 }));
 
 crudRoutes('news/bookmarks', 'newsBookmark', (body) => ({
@@ -311,14 +317,49 @@ app.get('/api/media/search', auth, async (req, res) => {
       const response = await fetch(url);
       if (!response.ok) throw new Error('TMDB request failed');
       const data = await response.json();
-      return res.json((data.results || []).map((movie) => ({
-        source: 'tmdb',
-        externalId: String(movie.id),
-        mediaType: 'movie',
-        title: movie.title,
-        imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
-        description: movie.overview
-      })));
+      const results = await Promise.all((data.results || []).slice(0, 9).map(async (movie) => {
+        try {
+          const detailsUrl = new URL(`https://api.themoviedb.org/3/movie/${movie.id}`);
+          detailsUrl.searchParams.set('language', 'de-DE');
+          detailsUrl.searchParams.set('api_key', process.env.TMDB_API_KEY);
+          detailsUrl.searchParams.set('append_to_response', 'credits,videos');
+          const detailsResponse = await fetch(detailsUrl);
+          if (!detailsResponse.ok) throw new Error('TMDB details failed');
+          const details = await detailsResponse.json();
+          const trailer = (details.videos?.results || []).find((video) => video.site === 'YouTube' && /Trailer/i.test(video.type));
+          return {
+            source: 'tmdb',
+            externalId: String(movie.id),
+            mediaType: 'movie',
+            title: details.title || movie.title,
+            imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
+            description: details.overview || movie.overview,
+            releaseYear: (details.release_date || movie.release_date || '').slice(0, 4) || null,
+            genres: (details.genres || []).map((genre) => genre.name).join(', '),
+            actors: (details.credits?.cast || []).slice(0, 6).map((actor) => actor.name).join(', '),
+            trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+            watched: false,
+            audience: 'Fuer mich'
+          };
+        } catch (error) {
+          console.error(error);
+          return {
+            source: 'tmdb',
+            externalId: String(movie.id),
+            mediaType: 'movie',
+            title: movie.title,
+            imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
+            description: movie.overview,
+            releaseYear: (movie.release_date || '').slice(0, 4) || null,
+            genres: '',
+            actors: '',
+            trailerUrl: null,
+            watched: false,
+            audience: 'Fuer mich'
+          };
+        }
+      }));
+      return res.json(results);
     } catch (error) {
       console.error(error);
     }
