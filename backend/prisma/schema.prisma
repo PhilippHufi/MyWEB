@@ -11,7 +11,19 @@ model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
   passwordHash String
+  lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
+  loginEvents  LoginEvent[]
+}
+
+model LoginEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  username  String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model FinanceEntry {

@@ -52,7 +52,7 @@ app.use(cors());
 app.use(express.json({ limit: '200mb' }));
 
 function signUser(user) {
-  return jwt.sign({ sub: user.id, username: user.email }, jwtSecret, { expiresIn: '7d' });
+  return jwt.sign({ sub: user.id, username: user.email }, jwtSecret, { expiresIn: '24h' });
 }
 
 function auth(req, res, next) {
@@ -781,15 +781,37 @@ app.post('/api/auth/login', async (req, res) => {
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid login' });
   }
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: now } }),
+    prisma.loginEvent.create({
+      data: {
+        userId: user.id,
+        username: user.email,
+        ip: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+        createdAt: now
+      }
+    })
+  ]);
   res.json({ token: signUser(user), user: { id: user.id, username: user.email } });
 });
 
 app.get('/api/users', auth, async (_req, res) => {
   const users = await prisma.user.findMany({
     orderBy: { id: 'asc' },
-    select: { id: true, email: true, createdAt: true }
+    select: { id: true, email: true, createdAt: true, lastLoginAt: true }
   });
   res.json(users);
+});
+
+app.get('/api/login-events', auth, async (_req, res) => {
+  const events = await prisma.loginEvent.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: { id: true, username: true, ip: true, userAgent: true, createdAt: true }
+  });
+  res.json(events);
 });
 
 app.post('/api/users', auth, async (req, res) => {
@@ -803,7 +825,7 @@ app.post('/api/users', auth, async (req, res) => {
       email: username,
       passwordHash: await bcrypt.hash(password, 10)
     },
-    select: { id: true, email: true, createdAt: true }
+    select: { id: true, email: true, createdAt: true, lastLoginAt: true }
   });
   res.status(201).json(user);
 });
@@ -817,7 +839,7 @@ app.put('/api/users/:id', auth, async (req, res) => {
   const user = await prisma.user.update({
     where: { id: Number(req.params.id) },
     data,
-    select: { id: true, email: true, createdAt: true }
+    select: { id: true, email: true, createdAt: true, lastLoginAt: true }
   });
   res.json(user);
 });

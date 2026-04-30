@@ -1306,6 +1306,7 @@ function List({ items, remove, render }) {
 
 function SettingsPage({ api }) {
   const [users, setUsers] = useState([]);
+  const [loginEvents, setLoginEvents] = useState([]);
   const [form, setForm] = useState({ username: '', password: '' });
   const [editing, setEditing] = useState(null);
   const [backupStatus, setBackupStatus] = useState('');
@@ -1314,8 +1315,13 @@ function SettingsPage({ api }) {
     setUsers(await api.request('users'));
   }
 
+  async function loadLoginEvents() {
+    setLoginEvents(await api.request('login-events'));
+  }
+
   useEffect(() => {
     loadUsers().catch(() => setUsers([]));
+    loadLoginEvents().catch(() => setLoginEvents([]));
   }, []);
 
   async function saveUser(event) {
@@ -1394,6 +1400,7 @@ function SettingsPage({ api }) {
               <div>
                 <p className="font-medium">{user.email}</p>
                 <p className="text-xs text-zinc-500">Angelegt: {formatDateTime(user.createdAt)}</p>
+                <p className="text-xs text-zinc-500">Letzter Login: {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'noch nie'}</p>
               </div>
               <div className="flex gap-2">
                 <Button type="button" className="bg-zinc-700" onClick={() => { setEditing(user); setForm({ username: user.email, password: '' }); }}>Bearbeiten</Button>
@@ -1402,6 +1409,22 @@ function SettingsPage({ api }) {
             </div>
           ))}
           {!users.length && <p className="text-sm text-zinc-500">Keine Benutzer geladen.</p>}
+        </div>
+      </Card>
+      <Card>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">Anmeldelogbuch</h2>
+          <Button type="button" className="bg-zinc-700" onClick={loadLoginEvents}>Aktualisieren</Button>
+        </div>
+        <div className="space-y-2">
+          {loginEvents.map((event) => (
+            <div key={event.id} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <p className="font-medium">{event.username}</p>
+              <p className="text-xs text-zinc-500">{formatDateTime(event.createdAt)}{event.ip ? ` - ${event.ip}` : ''}</p>
+              {event.userAgent && <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{event.userAgent}</p>}
+            </div>
+          ))}
+          {!loginEvents.length && <p className="text-sm text-zinc-500">Noch keine Anmeldungen gespeichert.</p>}
         </div>
       </Card>
     </div>
