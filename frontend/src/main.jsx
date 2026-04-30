@@ -508,6 +508,10 @@ function Media({ api }) {
   const [query, setQuery] = useState('');
   const [type, setType] = useState('movie');
   const [genre, setGenre] = useState('Alle');
+  const [listMode, setListMode] = useState('current');
+  const [region, setRegion] = useState('AT');
+  const [sort, setSort] = useState('popularity');
+  const [topMovies, setTopMovies] = useState([]);
   const [results, setResults] = useState([]);
 
   async function search(event) {
@@ -522,6 +526,10 @@ function Media({ api }) {
   const genres = ['Alle', ...Array.from(new Set(favs.items.flatMap((item) => (item.genres || '').split(',').map((name) => name.trim()).filter(Boolean))))];
   const filteredFavorites = genre === 'Alle' ? favs.items : favs.items.filter((item) => (item.genres || '').split(',').map((name) => name.trim()).includes(genre));
 
+  useEffect(() => {
+    api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}`).then(setTopMovies).catch(() => setTopMovies([]));
+  }, [listMode, region, sort]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -531,6 +539,28 @@ function Media({ api }) {
           <Button><Search className="h-4 w-4" />Suchen</Button>
         </form>
       </Card>
+      <Card>
+        <div className="grid gap-3 md:grid-cols-[1fr_160px_190px]">
+          <Select value={listMode} onChange={(e) => setListMode(e.target.value)}>
+            <option value="current">Top 30 aktuell</option>
+            <option value="previous">Top 30 Vorjahr</option>
+            <option value="next_year">Filme naechstes Jahr</option>
+          </Select>
+          <Select value={region} onChange={(e) => setRegion(e.target.value)} disabled={listMode === 'next_year'}>
+            <option value="AT">Oesterreich</option>
+            <option value="world">Weltweit</option>
+            <option value="US">Amerika</option>
+          </Select>
+          <Select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="popularity">Views / Popularitaet</option>
+            <option value="release_date">Erscheinungsdatum</option>
+            <option value="rating">Bewertung</option>
+          </Select>
+        </div>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        {topMovies.map((item) => <MediaCard key={`${listMode}-${region}-${sort}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         {results.map((item) => <MediaCard key={item.externalId} item={item} onSave={() => favs.add(item)} />)}
       </div>
@@ -555,10 +585,15 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
         <p className="mt-1 text-sm text-zinc-500">
           {[item.releaseYear, item.audience, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
         </p>
+        <p className="mt-1 text-sm text-zinc-500">
+          {item.rating != null ? `Bewertung ${Number(item.rating).toFixed(1)}/10` : 'Bewertung offen'}
+          {item.popularity != null ? ` - Popularitaet ${Math.round(Number(item.popularity))}` : ''}
+        </p>
       </button>
       <p className="mt-2 line-clamp-4 text-sm text-zinc-500">{item.description}</p>
       {open && (
         <div className="mt-3 space-y-2 text-sm">
+          {item.releaseDate && <p><span className="font-medium">Erscheinungsdatum:</span> {new Date(`${item.releaseDate}T00:00:00`).toLocaleDateString('de-AT')}</p>}
           {item.genres && <p><span className="font-medium">Genre:</span> {item.genres}</p>}
           {item.actors && <p><span className="font-medium">Schauspieler:</span> {item.actors}</p>}
           {item.trailerUrl && <a href={item.trailerUrl} target="_blank" rel="noreferrer" className="inline-flex text-sea underline">Trailer oeffnen</a>}

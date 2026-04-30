@@ -103,6 +103,43 @@ function fallbackWeatherDaily() {
   };
 }
 
+function movieSort(value) {
+  if (value === 'release_date') return 'primary_release_date.desc';
+  if (value === 'rating') return 'vote_average.desc';
+  return 'popularity.desc';
+}
+
+async function tmdbGenres() {
+  if (!process.env.TMDB_API_KEY) return new Map();
+  const url = new URL('https://api.themoviedb.org/3/genre/movie/list');
+  url.searchParams.set('language', 'de-DE');
+  url.searchParams.set('api_key', process.env.TMDB_API_KEY);
+  const response = await fetch(url);
+  if (!response.ok) return new Map();
+  const data = await response.json();
+  return new Map((data.genres || []).map((genre) => [genre.id, genre.name]));
+}
+
+function mapMovie(movie, genres = new Map()) {
+  return {
+    source: 'tmdb',
+    externalId: String(movie.id),
+    mediaType: 'movie',
+    title: movie.title,
+    imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
+    description: movie.overview,
+    releaseYear: (movie.release_date || '').slice(0, 4) || null,
+    releaseDate: movie.release_date || null,
+    genres: (movie.genre_ids || []).map((id) => genres.get(id)).filter(Boolean).join(', '),
+    actors: '',
+    trailerUrl: null,
+    rating: typeof movie.vote_average === 'number' ? movie.vote_average : null,
+    popularity: typeof movie.popularity === 'number' ? movie.popularity : null,
+    watched: false,
+    audience: 'Fuer mich'
+  };
+}
+
 function crudRoutes(path, model, mapInput = (body) => body, include) {
   app.get(`/api/${path}`, auth, async (_req, res) => {
     const items = await prisma[model].findMany({ orderBy: { id: 'desc' }, include });
@@ -197,6 +234,9 @@ crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   genres: Array.isArray(body.genres) ? body.genres.join(', ') : body.genres || null,
   actors: Array.isArray(body.actors) ? body.actors.join(', ') : body.actors || null,
   trailerUrl: body.trailerUrl || null,
+  rating: body.rating === '' || body.rating == null ? null : Number(body.rating),
+  popularity: body.popularity === '' || body.popularity == null ? null : Number(body.popularity),
+  releaseDate: body.releaseDate || null,
   watched: Boolean(body.watched),
   audience: body.audience || 'Fuer mich'
 }));
@@ -338,6 +378,9 @@ app.get('/api/media/search', auth, async (req, res) => {
             genres: (details.genres || []).map((genre) => genre.name).join(', '),
             actors: (details.credits?.cast || []).slice(0, 6).map((actor) => actor.name).join(', '),
             trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+            rating: typeof details.vote_average === 'number' ? details.vote_average : null,
+            popularity: typeof details.popularity === 'number' ? details.popularity : null,
+            releaseDate: details.release_date || movie.release_date || null,
             watched: false,
             audience: 'Fuer mich'
           };
@@ -354,6 +397,9 @@ app.get('/api/media/search', auth, async (req, res) => {
             genres: '',
             actors: '',
             trailerUrl: null,
+            rating: typeof movie.vote_average === 'number' ? movie.vote_average : null,
+            popularity: typeof movie.popularity === 'number' ? movie.popularity : null,
+            releaseDate: movie.release_date || null,
             watched: false,
             audience: 'Fuer mich'
           };
@@ -377,6 +423,48 @@ app.get('/api/media/search', auth, async (req, res) => {
         : 'Musik-Treffer manuell speichern. Eine Musik-API ist noch nicht konfiguriert.'
     }
   ]);
+});
+
+app.get('/api/media/discover', auth, async (req, res) => {
+  if (!process.env.TMDB_API_KEY) {
+    return res.json([]);
+  }
+
+  try {
+    const now = new Date();
+    const mode = String(req.query.mode || 'current');
+    const region = String(req.query.region || 'world');
+    const sort = String(req.query.sort || 'popularity');
+    const year = mode === 'previous' ? now.getFullYear() - 1 : now.getFullYear();
+    const url = new URL('https://api.themoviedb.org/3/discover/movie');
+    url.searchParams.set('language', 'de-DE');
+    url.searchParams.set('api_key', process.env.TMDB_API_KEY);
+    url.searchParams.set('include_adult', 'false');
+    url.searchParams.set('page', '1');
+    url.searchParams.set('vote_count.gte', sort === 'rating' ? '50' : '10');
+    url.searchParams.set('sort_by', mode === 'next_year' ? 'primary_release_date.asc' : movieSort(sort));
+
+    if (mode === 'next_year') {
+      const nextYear = now.getFullYear() + 1;
+      url.searchParams.set('primary_release_date.gte', `${nextYear}-01-01`);
+      url.searchParams.set('primary_release_date.lte', `${nextYear}-12-31`);
+    } else {
+      url.searchParams.set('primary_release_year', String(year));
+    }
+
+    if (region === 'AT' || region === 'US') {
+      url.searchParams.set('region', region);
+      url.searchParams.set('with_release_type', '2|3');
+    }
+
+    const [response, genres] = await Promise.all([fetch(url), tmdbGenres()]);
+    if (!response.ok) throw new Error('TMDB discover failed');
+    const data = await response.json();
+    res.json((data.results || []).slice(0, 30).map((movie) => mapMovie(movie, genres)));
+  } catch (error) {
+    console.error(error);
+    res.json([]);
+  }
 });
 
 app.get('/api/news', auth, async (req, res) => {

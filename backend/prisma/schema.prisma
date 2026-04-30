@@ -57,6 +57,9 @@ model FavoriteMedia {
   genres        String?
   actors        String?
   trailerUrl    String?
+  rating        Float?
+  popularity    Float?
+  releaseDate   String?
   watched       Boolean  @default(false)
   audience      String   @default("Fuer mich")
   createdAt     DateTime @default(now())
