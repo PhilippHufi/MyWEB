@@ -232,11 +232,126 @@ async function buildHotels(city, tripType) {
   return hotels.slice(0, 5);
 }
 
-async function generateCityInfo(city, tripType, durationDays) {
+function countryFromDisplayName(displayName = '') {
+  const raw = displayName.split(',').map((part) => part.trim()).filter(Boolean).at(-1) || '';
+  return {
+    Deutschland: 'Germany',
+    Österreich: 'Austria',
+    Oesterreich: 'Austria',
+    Schweiz: 'Switzerland',
+    Spanien: 'Spain',
+    España: 'Spain',
+    Italien: 'Italy',
+    Italia: 'Italy',
+    Frankreich: 'France',
+    Belgique: 'Belgium',
+    Belgien: 'Belgium',
+    Nederland: 'Netherlands',
+    Griechenland: 'Greece',
+    Ελλάδα: 'Greece',
+    Kroatien: 'Croatia',
+    Hrvatska: 'Croatia',
+    Türkei: 'Turkey',
+    Türkiye: 'Turkey',
+    Portugal: 'Portugal',
+    Sverige: 'Sweden',
+    Schweden: 'Sweden',
+    Norge: 'Norway',
+    Norwegen: 'Norway',
+    Danmark: 'Denmark',
+    Dänemark: 'Denmark',
+    'United States': 'United States',
+    USA: 'United States'
+  }[raw] || raw;
+}
+
+async function countryProfile(countryName) {
+  if (!countryName) return null;
+  try {
+    const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}?fields=name,translations,flags,population,area,languages,capital,region,subregion,currencies,maps`);
+    if (!response.ok) return null;
+    const [country] = await response.json();
+    const languages = Object.values(country.languages || {});
+    const currency = Object.values(country.currencies || {})[0];
+    return {
+      country: country.translations?.deu?.common || country.name?.common || countryName,
+      officialName: country.translations?.deu?.official || country.name?.official || countryName,
+      flag: country.flags?.svg || country.flags?.png || null,
+      population: country.population || null,
+      area: country.area || null,
+      capital: (country.capital || []).join(', '),
+      region: [country.region, country.subregion].filter(Boolean).join(' - '),
+      languages,
+      primaryLanguage: languages[0] || 'Englisch',
+      currency: currency ? [currency.name, currency.symbol].filter(Boolean).join(' ') : null,
+      mapsUrl: country.maps?.googleMaps || null
+    };
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+function translationGuide(language = 'Englisch', seed = '') {
+  const base = [
+    'Hallo',
+    'Danke',
+    'Bitte',
+    'Ja',
+    'Nein',
+    'Entschuldigung',
+    'Wie geht es dir?',
+    'Was kostet das?',
+    'Wo ist die Toilette?',
+    'Ich brauche Hilfe'
+  ];
+  const pool = ['Bahnhof', 'Flughafen', 'Wasser', 'Essen', 'Hotel', 'Strand', 'Museum', 'Arzt', 'Apotheke', 'Rechnung', 'Taxi', 'Eingang', 'Ausgang', 'Heute', 'Morgen', 'Links', 'Rechts', 'Karte', 'Ticket', 'Notfall'];
+  const start = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % pool.length;
+  const randomWords = Array.from({ length: 10 }, (_, index) => pool[(start + index) % pool.length]);
+  const dictionaries = {
+    Englisch: {
+      Hallo: 'Hello', Danke: 'Thank you', Bitte: 'Please', Ja: 'Yes', Nein: 'No', Entschuldigung: 'Sorry', 'Wie geht es dir?': 'How are you?', 'Was kostet das?': 'How much is this?', 'Wo ist die Toilette?': 'Where is the toilet?', 'Ich brauche Hilfe': 'I need help',
+      Bahnhof: 'Train station', Flughafen: 'Airport', Wasser: 'Water', Essen: 'Food', Hotel: 'Hotel', Strand: 'Beach', Museum: 'Museum', Arzt: 'Doctor', Apotheke: 'Pharmacy', Rechnung: 'Bill', Taxi: 'Taxi', Eingang: 'Entrance', Ausgang: 'Exit', Heute: 'Today', Morgen: 'Tomorrow', Links: 'Left', Rechts: 'Right', Karte: 'Map', Ticket: 'Ticket', Notfall: 'Emergency'
+    },
+    Spanisch: {
+      Hallo: 'Hola', Danke: 'Gracias', Bitte: 'Por favor', Ja: 'Sí', Nein: 'No', Entschuldigung: 'Perdón', 'Wie geht es dir?': '¿Cómo estás?', 'Was kostet das?': '¿Cuánto cuesta?', 'Wo ist die Toilette?': '¿Dónde está el baño?', 'Ich brauche Hilfe': 'Necesito ayuda',
+      Bahnhof: 'Estación', Flughafen: 'Aeropuerto', Wasser: 'Agua', Essen: 'Comida', Hotel: 'Hotel', Strand: 'Playa', Museum: 'Museo', Arzt: 'Médico', Apotheke: 'Farmacia', Rechnung: 'Cuenta', Taxi: 'Taxi', Eingang: 'Entrada', Ausgang: 'Salida', Heute: 'Hoy', Morgen: 'Mañana', Links: 'Izquierda', Rechts: 'Derecha', Karte: 'Mapa', Ticket: 'Billete', Notfall: 'Emergencia'
+    },
+    Französisch: {
+      Hallo: 'Bonjour', Danke: 'Merci', Bitte: 'S’il vous plaît', Ja: 'Oui', Nein: 'Non', Entschuldigung: 'Pardon', 'Wie geht es dir?': 'Comment ça va?', 'Was kostet das?': 'Combien ça coûte?', 'Wo ist die Toilette?': 'Où sont les toilettes?', 'Ich brauche Hilfe': 'J’ai besoin d’aide',
+      Bahnhof: 'Gare', Flughafen: 'Aéroport', Wasser: 'Eau', Essen: 'Nourriture', Hotel: 'Hôtel', Strand: 'Plage', Museum: 'Musée', Arzt: 'Médecin', Apotheke: 'Pharmacie', Rechnung: 'Addition', Taxi: 'Taxi', Eingang: 'Entrée', Ausgang: 'Sortie', Heute: 'Aujourd’hui', Morgen: 'Demain', Links: 'Gauche', Rechts: 'Droite', Karte: 'Carte', Ticket: 'Billet', Notfall: 'Urgence'
+    },
+    Italienisch: {
+      Hallo: 'Ciao', Danke: 'Grazie', Bitte: 'Per favore', Ja: 'Sì', Nein: 'No', Entschuldigung: 'Scusa', 'Wie geht es dir?': 'Come stai?', 'Was kostet das?': 'Quanto costa?', 'Wo ist die Toilette?': 'Dov’è il bagno?', 'Ich brauche Hilfe': 'Ho bisogno di aiuto',
+      Bahnhof: 'Stazione', Flughafen: 'Aeroporto', Wasser: 'Acqua', Essen: 'Cibo', Hotel: 'Hotel', Strand: 'Spiaggia', Museum: 'Museo', Arzt: 'Medico', Apotheke: 'Farmacia', Rechnung: 'Conto', Taxi: 'Taxi', Eingang: 'Entrata', Ausgang: 'Uscita', Heute: 'Oggi', Morgen: 'Domani', Links: 'Sinistra', Rechts: 'Destra', Karte: 'Mappa', Ticket: 'Biglietto', Notfall: 'Emergenza'
+    },
+    Deutsch: {
+      Hallo: 'Hallo', Danke: 'Danke', Bitte: 'Bitte', Ja: 'Ja', Nein: 'Nein', Entschuldigung: 'Entschuldigung', 'Wie geht es dir?': 'Wie geht es dir?', 'Was kostet das?': 'Was kostet das?', 'Wo ist die Toilette?': 'Wo ist die Toilette?', 'Ich brauche Hilfe': 'Ich brauche Hilfe',
+      Bahnhof: 'Bahnhof', Flughafen: 'Flughafen', Wasser: 'Wasser', Essen: 'Essen', Hotel: 'Hotel', Strand: 'Strand', Museum: 'Museum', Arzt: 'Arzt', Apotheke: 'Apotheke', Rechnung: 'Rechnung', Taxi: 'Taxi', Eingang: 'Eingang', Ausgang: 'Ausgang', Heute: 'Heute', Morgen: 'Morgen', Links: 'Links', Rechts: 'Rechts', Karte: 'Karte', Ticket: 'Ticket', Notfall: 'Notfall'
+    }
+  };
+  const normalized = /spanisch|spanish/i.test(language) ? 'Spanisch'
+    : /franz|french/i.test(language) ? 'Französisch'
+    : /ital|italian/i.test(language) ? 'Italienisch'
+    : /deutsch|german/i.test(language) ? 'Deutsch'
+    : 'Englisch';
+  const dict = dictionaries[normalized];
+  return {
+    language: normalized,
+    items: [...base, ...randomWords].map((german) => ({ german, translated: dict[german] || german }))
+  };
+}
+
+async function generateCityInfo(city, tripType, durationDays, profile) {
   const fallback = {
-    cultureInfo: `${city.name} eignet sich fuer ${tripType}. Plane vormittags die wichtigsten Sehenswuerdigkeiten und nachmittags entspannte Viertel, Maerkte oder Aussichtspunkte.`,
+    cultureInfo: `${city.name} eignet sich fuer ${tripType}. Plane vormittags die wichtigsten Sehenswuerdigkeiten und nachmittags entspannte Viertel, Maerkte oder Aussichtspunkte. ${profile?.country ? `${city.name} liegt in ${profile.country}. Dort sind Sprache, Essen, Alltag und Architektur stark von der regionalen Geschichte geprägt.` : ''}`,
     behaviorTips: ['Wertsachen nah am Koerper tragen.', 'Tickets fuer beliebte Orte frueh buchen.', 'Oeffentliche Verkehrsmittel vorab pruefen.', 'In touristischen Bereichen auf Taschendiebe achten.'],
-    funFacts: [`${city.name} laesst sich gut in ${durationDays} Tagen erkunden.`, 'Lokale Maerkte sind oft die beste Quelle fuer Essen und Alltagskultur.', 'Fruehe Startzeiten vermeiden Warteschlangen.']
+    funFacts: [`${city.name} laesst sich gut in ${durationDays} Tagen erkunden.`, 'Lokale Maerkte sind oft die beste Quelle fuer Essen und Alltagskultur.', 'Fruehe Startzeiten vermeiden Warteschlangen.'],
+    destinationDetails: {
+      culture: `${city.name} verbindet Alltagsleben, Geschichte und lokale Küche. Besonders spannend sind Märkte, Altstadtbereiche und Viertel abseits der Hauptstraßen.`,
+      religion: 'Je nach Land und Region unterschiedlich; vor Ort lohnt sich ein respektvoller Umgang mit Kirchen, Moscheen, Synagogen, Tempeln und religiösen Feiertagen.',
+      travelNote: `${durationDays} Tage reichen gut, um die wichtigsten Orte zu sehen und trotzdem Pausen einzuplanen.`
+    }
   };
   if (!process.env.OPENAI_API_KEY) return fallback;
   try {
@@ -245,7 +360,7 @@ async function generateCityInfo(city, tripType, durationDays) {
       headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
-        input: `Erstelle kurze Reise-Zusatzinfos fuer ${city.name}, ${durationDays} Tage, Typ ${tripType}. Antworte nur als JSON mit cultureInfo string, behaviorTips array, funFacts array.`
+        input: `Erstelle Reise-Zusatzinfos fuer ${city.name}, ${durationDays} Tage, Typ ${tripType}. Landinfos: ${JSON.stringify(profile || {})}. Antworte nur als JSON mit cultureInfo string, behaviorTips array, funFacts array und destinationDetails object mit culture, religion, travelNote.`
       })
     });
     if (!response.ok) throw new Error('AI request failed');
@@ -260,6 +375,7 @@ async function generateCityInfo(city, tripType, durationDays) {
 
 async function buildTripPlan({ city, durationDays, tripType }) {
   const place = await geocodeCity(city);
+  const profile = await countryProfile(countryFromDisplayName(place.displayName));
   const fetched = await cityPlaces(place, tripType).catch(() => []);
   const places = fetched.length >= 6 ? fetched : await fallbackPlaces(place, tripType);
   const ordered = orderedByDistance({ lat: place.lat, lng: place.lng }, places);
@@ -276,7 +392,7 @@ async function buildTripPlan({ city, durationDays, tripType }) {
       })).slice(0, 3);
     }
   }
-  const info = await generateCityInfo(place, tripType, durationDays);
+  const info = await generateCityInfo(place, tripType, durationDays, profile);
   return {
     city: place.name,
     displayName: place.displayName,
@@ -285,6 +401,8 @@ async function buildTripPlan({ city, durationDays, tripType }) {
     coordinates: { lat: place.lat, lng: place.lng },
     days,
     hotels: await buildHotels(place, tripType),
+    countryProfile: profile,
+    translations: translationGuide(profile?.primaryLanguage, place.name),
     ...info
   };
 }

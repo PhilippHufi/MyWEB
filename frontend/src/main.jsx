@@ -1154,6 +1154,43 @@ function Travel({ api }) {
               ))}
             </div>
           </Card>
+
+          <div className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
+            <Card>
+              <h2 className="mb-3 font-semibold">Mehr über das Reiseziel</h2>
+              {plan.countryProfile?.flag && <img src={plan.countryProfile.flag} alt="" className="mb-3 h-20 rounded-md object-cover" />}
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <p><span className="font-medium">Land:</span> {plan.countryProfile?.country || '-'}</p>
+                <p><span className="font-medium">Hauptstadt:</span> {plan.countryProfile?.capital || '-'}</p>
+                <p><span className="font-medium">Einwohner:</span> {plan.countryProfile?.population ? new Intl.NumberFormat('de-AT').format(plan.countryProfile.population) : '-'}</p>
+                <p><span className="font-medium">Fläche:</span> {plan.countryProfile?.area ? `${new Intl.NumberFormat('de-AT').format(plan.countryProfile.area)} km²` : '-'}</p>
+                <p><span className="font-medium">Amtssprache:</span> {(plan.countryProfile?.languages || []).join(', ') || '-'}</p>
+                <p><span className="font-medium">Währung:</span> {plan.countryProfile?.currency || '-'}</p>
+                <p className="sm:col-span-2"><span className="font-medium">Region:</span> {plan.countryProfile?.region || '-'}</p>
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-zinc-600 dark:text-zinc-300">
+                <p><span className="font-medium text-zinc-900 dark:text-zinc-100">Kultur:</span> {plan.destinationDetails?.culture || plan.cultureInfo}</p>
+                <p><span className="font-medium text-zinc-900 dark:text-zinc-100">Glaube:</span> {plan.destinationDetails?.religion || 'Regional unterschiedlich. Bei religiösen Orten und Feiertagen respektvoll auftreten.'}</p>
+                <p><span className="font-medium text-zinc-900 dark:text-zinc-100">Reisehinweis:</span> {plan.destinationDetails?.travelNote || 'Plane Pausen ein und prüfe Öffnungszeiten vorab.'}</p>
+              </div>
+              {plan.countryProfile?.mapsUrl && <Button type="button" className="mt-4 bg-zinc-700" onClick={() => window.open(plan.countryProfile.mapsUrl, '_blank', 'noopener,noreferrer')}>Land auf Karte öffnen</Button>}
+            </Card>
+
+            <Card>
+              <h2 className="mb-3 font-semibold">Übersetzung</h2>
+              <p className="mb-3 text-sm text-zinc-500">Sprache: {plan.translations?.language || plan.countryProfile?.primaryLanguage || 'Englisch'}</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {(plan.translations?.items || []).map((item) => (
+                  <div key={item.german} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                    <p className="text-xs uppercase text-zinc-500">Deutsch</p>
+                    <p className="font-medium">{item.german}</p>
+                    <p className="mt-2 text-xs uppercase text-zinc-500">Übersetzt</p>
+                    <p>{item.translated}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
         </>
       )}
     </div>
