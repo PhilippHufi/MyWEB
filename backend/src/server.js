@@ -63,6 +63,11 @@ function parseDate(value) {
   return value ? new Date(value) : null;
 }
 
+function sqlitePath() {
+  const url = process.env.DATABASE_URL || 'file:/data/prod.db';
+  return url.startsWith('file:') ? path.resolve(url.slice('file:'.length)) : null;
+}
+
 function distanceKm(a, b) {
   const radius = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -97,6 +102,20 @@ function inferCategory(title, tripType) {
 function stableRating(text, min = 4.1, max = 4.9) {
   const sum = [...text].reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return Number((min + (sum % 80) / 100 * ((max - min) / 0.8)).toFixed(1));
+}
+
+function placeholderImage(title, subtitle = 'Reiseplan') {
+  const colors = ['#386641', '#bc6c25', '#2f6690', '#8a5a44', '#6a994e'];
+  const color = colors[[...title].reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length];
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+      <rect width="900" height="600" fill="${color}"/>
+      <circle cx="760" cy="110" r="120" fill="rgba(255,255,255,.16)"/>
+      <path d="M0 430 C180 360 260 470 420 390 C570 315 650 420 900 330 L900 600 L0 600 Z" fill="rgba(255,255,255,.20)"/>
+      <text x="55" y="420" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="white">${title.replace(/[<>&]/g, '')}</text>
+      <text x="58" y="472" font-family="Arial, sans-serif" font-size="28" fill="rgba(255,255,255,.86)">${subtitle.replace(/[<>&]/g, '')}</text>
+    </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }
 
 async function geocodeCity(city) {
@@ -141,7 +160,7 @@ async function cityPlaces(city, tripType) {
       name: place.title,
       coordinates: { lat: place.lat, lng: place.lon },
       description: summary?.extract || 'Interessanter Ort in der Stadt.',
-      imageUrl: summary?.thumbnail?.source || `https://source.unsplash.com/900x600/?${encodeURIComponent(place.title)}`,
+      imageUrl: summary?.thumbnail?.source || placeholderImage(place.title, city.name),
       rating: stableRating(place.title),
       category: inferCategory(place.title, tripType)
     };
@@ -157,7 +176,7 @@ function fallbackPlaces(city, tripType) {
     name,
     coordinates: { lat: city.lat + index * 0.006, lng: city.lng + index * 0.005 },
     description: `${name} in ${city.name}: passend fuer einen ${tripType}.`,
-    imageUrl: `https://source.unsplash.com/900x600/?${encodeURIComponent(`${city.name} ${name}`)}`,
+    imageUrl: placeholderImage(name, city.name),
     rating: stableRating(name),
     category: inferCategory(name, tripType)
   }));
@@ -169,7 +188,7 @@ function buildHotels(city, tripType) {
     name: `${city.name} ${name} Hotel`,
     price: `${90 + index * 25}-${140 + index * 35} EUR/Nacht`,
     rating: Number((4.2 + index * 0.12).toFixed(1)),
-    imageUrl: `https://source.unsplash.com/900x600/?hotel,${encodeURIComponent(city.name)}`,
+    imageUrl: placeholderImage(`${name} Hotel`, city.name),
     description: tripType === 'Strandurlaub' ? 'Strandnah oder gut ans Wasser angebunden.' : 'Zentral gelegen fuer kurze Wege zu Kultur und Altstadt.'
   })).slice(0, 5);
 }
@@ -312,6 +331,17 @@ async function tmdbGenres() {
   return new Map((data.genres || []).map((genre) => [genre.id, genre.name]));
 }
 
+async function tmdbKeywordId(keyword) {
+  if (!keyword || !process.env.TMDB_API_KEY) return null;
+  const url = new URL('https://api.themoviedb.org/3/search/keyword');
+  url.searchParams.set('api_key', process.env.TMDB_API_KEY);
+  url.searchParams.set('query', keyword);
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.results?.[0]?.id || null;
+}
+
 function mapMovie(movie, genres = new Map()) {
   return {
     source: 'tmdb',
@@ -359,6 +389,32 @@ function crudRoutes(path, model, mapInput = (body) => body, include) {
 }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/api/backups', auth, (_req, res) => {
+  const dbPath = sqlitePath();
+  if (!dbPath) return res.json([]);
+  const backupDir = path.join(path.dirname(dbPath), 'backups');
+  if (!fs.existsSync(backupDir)) return res.json([]);
+  const items = fs.readdirSync(backupDir)
+    .filter((name) => name.endsWith('.bak') || name.includes('.db-'))
+    .map((name) => {
+      const file = path.join(backupDir, name);
+      const stat = fs.statSync(file);
+      return { name, size: stat.size, createdAt: stat.mtime };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(items);
+});
+
+app.get('/api/backups/:name/download', auth, (req, res) => {
+  const dbPath = sqlitePath();
+  if (!dbPath) return res.status(404).json({ error: 'No sqlite database configured' });
+  const backupDir = path.join(path.dirname(dbPath), 'backups');
+  const safeName = path.basename(req.params.name);
+  const file = path.join(backupDir, safeName);
+  if (!file.startsWith(backupDir) || !fs.existsSync(file)) return res.status(404).json({ error: 'Backup not found' });
+  res.download(file, safeName);
+});
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, email, password } = req.body;
@@ -662,6 +718,8 @@ app.get('/api/media/discover', auth, async (req, res) => {
     const sort = String(req.query.sort || 'popularity');
     const limit = Math.max(1, Math.min(200, Number(req.query.limit || 30)));
     const genreId = String(req.query.genreId || '');
+    const keyword = String(req.query.keyword || '');
+    const keywordId = await tmdbKeywordId(keyword);
     const year = mode === 'previous' ? now.getFullYear() - 1 : now.getFullYear();
     const genres = await tmdbGenres();
     const results = [];
@@ -676,6 +734,7 @@ app.get('/api/media/discover', auth, async (req, res) => {
       url.searchParams.set('vote_count.gte', sort === 'rating' ? '50' : '10');
       url.searchParams.set('sort_by', mode === 'future' ? 'primary_release_date.asc' : movieSort(sort));
       if (genreId) url.searchParams.set('with_genres', genreId);
+      if (keywordId) url.searchParams.set('with_keywords', String(keywordId));
 
       if (mode === 'future') {
         const start = now.toISOString().slice(0, 10);

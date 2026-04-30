@@ -57,12 +57,14 @@ Die App nutzt SQLite unter:
 
 In `render.yaml` ist dafuer eine persistente Render Disk mit 1 GB konfiguriert. Daten bleiben dadurch bei Neustarts und Deployments erhalten.
 
+Wichtig: In Render muss beim Web Service wirklich eine Disk mit Mount Path `/data` angehaengt sein. Ohne diese Disk startet die App zwar, aber Render legt bei jedem Deploy eine neue leere Container-Datei an.
+
+Vor jedem Produktionsstart legt die App automatisch Backups der SQLite-Datei unter `/data/backups` an und behaelt die neuesten Backups. Die Backups liegen auf derselben Render Disk.
+
 Beim Start fuehrt die App automatisch aus:
 
 ```bash
-prisma migrate deploy
-node prisma/seed.js
-node src/server.js
+node scripts/start-prod.js
 ```
 
 Dadurch wird die Datenbank aktualisiert und dein Login-Benutzer angelegt.

@@ -514,25 +514,27 @@ function Media({ api }) {
   const [region, setRegion] = useState('AT');
   const [sort, setSort] = useState('popularity');
   const [limit, setLimit] = useState(50);
-  const [discoverGenre, setDiscoverGenre] = useState('');
+  const [discoverGenre, setDiscoverGenre] = useState('Alle Genres');
   const [topMovies, setTopMovies] = useState([]);
   const [futureMovies, setFutureMovies] = useState([]);
   const [results, setResults] = useState([]);
   const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:media-trash') || '[]'));
   const tmdbGenres = [
-    ['Alle Genres', ''],
-    ['Action', '28'],
-    ['Abenteuer', '12'],
-    ['Animation', '16'],
-    ['Komödie', '35'],
-    ['Krimi', '80'],
-    ['Drama', '18'],
-    ['Familie', '10751'],
-    ['Fantasy', '14'],
-    ['Horror', '27'],
-    ['Romanze', '10749'],
-    ['Science Fiction', '878'],
-    ['Thriller', '53']
+    { label: 'Alle Genres', genreId: '', keyword: '' },
+    { label: 'Action', genreId: '28', keyword: '' },
+    { label: 'Abenteuer', genreId: '12', keyword: '' },
+    { label: 'Animation', genreId: '16', keyword: '' },
+    { label: 'Komödie', genreId: '35', keyword: '' },
+    { label: 'Krimi', genreId: '80', keyword: '' },
+    { label: 'Drama', genreId: '18', keyword: '' },
+    { label: 'Erotik', genreId: '', keyword: 'erotic' },
+    { label: 'Familie', genreId: '10751', keyword: '' },
+    { label: 'Fantasy', genreId: '14', keyword: '' },
+    { label: 'Horror', genreId: '27', keyword: '' },
+    { label: 'Romanze', genreId: '10749', keyword: '' },
+    { label: 'Science Fiction', genreId: '878', keyword: '' },
+    { label: 'Sport', genreId: '', keyword: 'sport' },
+    { label: 'Thriller', genreId: '53', keyword: '' }
   ];
 
   function setTrashItems(next) {
@@ -571,11 +573,13 @@ function Media({ api }) {
   });
 
   useEffect(() => {
-    api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}&limit=${limit}&genreId=${discoverGenre}`).then(setTopMovies).catch(() => setTopMovies([]));
+    const selected = tmdbGenres.find((entry) => entry.label === discoverGenre) || tmdbGenres[0];
+    api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}&limit=${limit}&genreId=${selected.genreId}&keyword=${encodeURIComponent(selected.keyword)}`).then(setTopMovies).catch(() => setTopMovies([]));
   }, [listMode, region, sort, limit, discoverGenre]);
 
   useEffect(() => {
-    api.request(`media/discover?mode=future&region=world&sort=release_date&limit=100&genreId=${discoverGenre}`).then(setFutureMovies).catch(() => setFutureMovies([]));
+    const selected = tmdbGenres.find((entry) => entry.label === discoverGenre) || tmdbGenres[0];
+    api.request(`media/discover?mode=future&region=world&sort=release_date&limit=100&genreId=${selected.genreId}&keyword=${encodeURIComponent(selected.keyword)}`).then(setFutureMovies).catch(() => setFutureMovies([]));
   }, [discoverGenre]);
 
   return (
@@ -605,7 +609,7 @@ function Media({ api }) {
             <option value={200}>Top 200</option>
           </Select>
           <Select value={discoverGenre} onChange={(e) => setDiscoverGenre(e.target.value)}>
-            {tmdbGenres.map(([label, id]) => <option key={id || 'all'} value={id}>{label}</option>)}
+            {tmdbGenres.map((entry) => <option key={entry.label} value={entry.label}>{entry.label}</option>)}
           </Select>
           <Select value={listMode} onChange={(e) => setListMode(e.target.value)}>
             <option value="current">Aktuell</option>
@@ -632,7 +636,7 @@ function Media({ api }) {
               <p className="text-sm text-zinc-500">Geplante Veröffentlichungen, nach Erscheinungsdatum sortiert.</p>
             </div>
             <Select value={discoverGenre} onChange={(e) => setDiscoverGenre(e.target.value)}>
-              {tmdbGenres.map(([label, id]) => <option key={id || 'all'} value={id}>{label}</option>)}
+              {tmdbGenres.map((entry) => <option key={entry.label} value={entry.label}>{entry.label}</option>)}
             </Select>
           </div>
         </Card>
@@ -792,8 +796,14 @@ function Travel({ api }) {
   const [form, setForm] = useState({ city: 'Barcelona', durationDays: 7, tripType: 'Gemischt' });
   const [plan, setPlan] = useState(null);
   const [savedTrips, setSavedTrips] = useState([]);
+  const [tripTrash, setTripTrash] = useState(() => JSON.parse(localStorage.getItem('pd:trip-trash') || '[]'));
   const [loading, setLoading] = useState(false);
   const [drag, setDrag] = useState(null);
+
+  function setTripTrashItems(next) {
+    setTripTrash(next);
+    localStorage.setItem('pd:trip-trash', JSON.stringify(next));
+  }
 
   async function loadTrips() {
     const data = await api.request('trips');
@@ -835,6 +845,33 @@ function Travel({ api }) {
     });
   }
 
+  async function deleteTrip(trip) {
+    if (!window.confirm(`Reise nach ${trip.destination} wirklich löschen?`)) return;
+    setTripTrashItems([{ ...trip, deletedAt: new Date().toISOString() }, ...tripTrash.filter((item) => item.id !== trip.id)]);
+    await api.request(`trips/${trip.id}`, { method: 'DELETE' });
+    if (plan?.savedTripId === trip.id) setPlan(null);
+    await loadTrips();
+  }
+
+  async function restoreTrip(trip) {
+    const restoredPlan = trip.plan;
+    const saved = await api.request('trips', {
+      method: 'POST',
+      body: JSON.stringify({
+        destination: restoredPlan?.city || trip.destination,
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: new Date(Date.now() + (Number(restoredPlan?.durationDays || 1) - 1) * 86400000).toISOString().slice(0, 10),
+        durationDays: restoredPlan?.durationDays,
+        tripType: restoredPlan?.tripType,
+        notes: restoredPlan?.cultureInfo || trip.notes,
+        planJson: restoredPlan
+      })
+    });
+    setPlan({ ...restoredPlan, savedTripId: saved.id });
+    setTripTrashItems(tripTrash.filter((item) => item.id !== trip.id));
+    await loadTrips();
+  }
+
   return (
     <div className="space-y-5">
       <Card>
@@ -853,11 +890,32 @@ function Travel({ api }) {
       {!!savedTrips.length && (
         <Card>
           <h2 className="mb-3 font-semibold">Gespeicherte Reisen</h2>
-          <div className="flex flex-wrap gap-2">
-            {savedTrips.map((trip) => <Button key={trip.id} type="button" onClick={() => setPlan(trip.plan)}>{trip.destination}</Button>)}
+          <div className="space-y-2">
+            {savedTrips.map((trip) => (
+              <div key={trip.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                <button type="button" className="font-medium" onClick={() => setPlan({ ...trip.plan, savedTripId: trip.id })}>{trip.destination}</button>
+                <button type="button" className="icon-btn" onClick={() => deleteTrip(trip)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
           </div>
         </Card>
       )}
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Reise-Papierkorb</h2>
+          <Button type="button" disabled={!tripTrash.length} onClick={() => window.confirm('Papierkorb wirklich komplett leeren?') && setTripTrashItems([])}>Papierkorb leeren</Button>
+        </div>
+        <div className="space-y-2">
+          {tripTrash.map((trip) => (
+            <div key={`${trip.id}-${trip.deletedAt}`} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <span>{trip.destination}</span>
+              <Button type="button" onClick={() => restoreTrip(trip)}>Wiederherstellen</Button>
+            </div>
+          ))}
+          {!tripTrash.length && <p className="text-sm text-zinc-500">Keine gelöschten Reisen.</p>}
+        </div>
+      </Card>
 
       {plan && (
         <>
@@ -903,7 +961,7 @@ function Travel({ api }) {
                       onDragEnd={() => setDrag(null)}
                       className="grid gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:grid-cols-[110px_1fr]"
                     >
-                      {activity.imageUrl && <img src={activity.imageUrl} alt="" className="h-24 w-full rounded-md object-cover" />}
+                      <img src={activity.imageUrl} alt="" className="h-24 w-full rounded-md object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="font-semibold">{activity.name}</h4>
@@ -924,7 +982,7 @@ function Travel({ api }) {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {plan.hotels.map((hotel) => (
                 <article key={hotel.name} className="overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
-                  {hotel.imageUrl && <img src={hotel.imageUrl} alt="" className="aspect-video w-full object-cover" />}
+                  <img src={hotel.imageUrl} alt="" className="aspect-video w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
                   <div className="p-3 text-sm">
                     <h3 className="font-semibold">{hotel.name}</h3>
                     <p className="mt-1 text-zinc-500">{hotel.price} - {hotel.rating}/5</p>
