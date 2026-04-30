@@ -1,0 +1,24 @@
+services:
+  personal-dashboard:
+    build: .
+    container_name: personal-dashboard
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: "file:/data/prod.db"
+      PORT: "4000"
+      JWT_SECRET: "change-this-to-a-long-random-secret"
+      DEFAULT_USER_EMAIL: "me@example.com"
+      DEFAULT_USER_PASSWORD: "dashboard123"
+      TMDB_API_KEY: ""
+      NEWS_API_KEY: ""
+      TRAFFIC_RSS_URL: ""
+      WEATHER_LAT: "48.3069"
+      WEATHER_LON: "14.2858"
+      WEATHER_LABEL: "Linz, Oberoesterreich"
+    volumes:
+      - personal_dashboard_data:/data
+
+volumes:
+  personal_dashboard_data:

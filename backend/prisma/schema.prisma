@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model FinanceEntry {
+  id          Int      @id @default(autoincrement())
+  type        String
+  category    String
+  amount      Float
+  description String?
+  date        DateTime
+  createdAt   DateTime @default(now())
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  category    String
+  priority    String
+  dueDate     DateTime?
+  completed   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model GiftIdea {
+  id        Int      @id @default(autoincrement())
+  name      String
+  person    String
+  price     Float?
+  status    String
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model FavoriteMedia {
+  id          Int      @id @default(autoincrement())
+  source      String
+  externalId  String?
+  mediaType   String
+  title       String
+  imageUrl    String?
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model NewsBookmark {
+  id          Int      @id @default(autoincrement())
+  title       String
+  url         String
+  source      String?
+  category    String?
+  description String?
+  imageUrl     String?
+  createdAt   DateTime @default(now())
+}
+
+model Trip {
+  id          Int              @id @default(autoincrement())
+  destination String
+  startDate   DateTime
+  endDate     DateTime
+  notes       String?
+  createdAt   DateTime         @default(now())
+  hotels      TripHotel[]
+  attractions TripAttraction[]
+}
+
+model TripHotel {
+  id      Int     @id @default(autoincrement())
+  name    String
+  address String?
+  url     String?
+  notes   String?
+  tripId  Int
+  trip    Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+model TripAttraction {
+  id      Int     @id @default(autoincrement())
+  name    String
+  address String?
+  url     String?
+  notes   String?
+  tripId  Int
+  trip    Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
