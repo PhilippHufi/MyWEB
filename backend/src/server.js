@@ -928,6 +928,83 @@ crudRoutes('finance', 'financeEntry', (body) => ({
   date: parseDate(body.date) || new Date()
 }));
 
+const marketCache = { at: 0, data: null };
+const marketAssets = [
+  { id: 'gold', name: 'Gold', type: 'fx', from: 'XAU', to: 'USD', unit: 'USD/oz' },
+  { id: 'silver', name: 'Silver', type: 'fx', from: 'XAG', to: 'USD', unit: 'USD/oz' },
+  { id: 'oil', name: 'Oil', type: 'commodity', function: 'WTI', unit: 'USD/Barrel' },
+  { id: 'copper', name: 'Kupfer', type: 'commodity', function: 'COPPER', unit: 'USD/lb' },
+  { id: 'btc', name: 'BTC', type: 'fx', from: 'BTC', to: 'USD', unit: 'USD' },
+  { id: 'eth', name: 'ETH', type: 'fx', from: 'ETH', to: 'USD', unit: 'USD' },
+  { id: 'hbar', name: 'HBAR', type: 'fx', from: 'HBAR', to: 'USD', unit: 'USD' },
+  { id: 'nasdaq', name: 'NASDAQ', type: 'quote', symbol: 'ONEQ', unit: 'USD', note: 'Proxy: ONEQ ETF' },
+  { id: 'us100', name: 'US100', type: 'quote', symbol: 'QQQ', unit: 'USD', note: 'Proxy: QQQ ETF' },
+  { id: 'dax', name: 'DAX', type: 'quote', symbol: 'DAX', unit: 'USD', note: 'Proxy: DAX ETF' },
+  { id: 'sp500', name: 'S&P500', type: 'quote', symbol: 'SPY', unit: 'USD', note: 'Proxy: SPY ETF' }
+];
+
+async function alphaRequest(params) {
+  const url = new URL('https://www.alphavantage.co/query');
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  url.searchParams.set('apikey', process.env.ALPHAVANTAGE_API_KEY || '');
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Alpha Vantage request failed');
+  const data = await response.json();
+  if (data.Note || data.Information) throw new Error(data.Note || data.Information);
+  return data;
+}
+
+async function marketAsset(asset) {
+  if (!process.env.ALPHAVANTAGE_API_KEY) return { ...asset, value: null, changePercent: null, status: 'ALPHAVANTAGE_API_KEY fehlt' };
+  try {
+    if (asset.type === 'fx') {
+      const data = await alphaRequest({ function: 'CURRENCY_EXCHANGE_RATE', from_currency: asset.from, to_currency: asset.to });
+      const rate = data['Realtime Currency Exchange Rate'] || {};
+      return {
+        ...asset,
+        value: Number(rate['5. Exchange Rate']),
+        changePercent: null,
+        updatedAt: rate['6. Last Refreshed'] || null,
+        source: 'Alpha Vantage'
+      };
+    }
+    if (asset.type === 'commodity') {
+      const data = await alphaRequest({ function: asset.function, interval: 'daily' });
+      const latest = (data.data || []).find((entry) => entry.value && entry.value !== '.');
+      const previous = (data.data || []).filter((entry) => entry.value && entry.value !== '.')[1];
+      const value = latest ? Number(latest.value) : null;
+      const previousValue = previous ? Number(previous.value) : null;
+      return {
+        ...asset,
+        value,
+        changePercent: value != null && previousValue ? ((value - previousValue) / previousValue) * 100 : null,
+        updatedAt: latest?.date || null,
+        source: 'Alpha Vantage'
+      };
+    }
+    const data = await alphaRequest({ function: 'GLOBAL_QUOTE', symbol: asset.symbol });
+    const quote = data['Global Quote'] || {};
+    return {
+      ...asset,
+      value: Number(quote['05. price']),
+      changePercent: quote['10. change percent'] ? Number(String(quote['10. change percent']).replace('%', '')) : null,
+      updatedAt: quote['07. latest trading day'] || null,
+      source: 'Alpha Vantage'
+    };
+  } catch (error) {
+    return { ...asset, value: null, changePercent: null, status: error.message, source: 'Alpha Vantage' };
+  }
+}
+
+app.get('/api/markets', auth, async (_req, res) => {
+  const now = Date.now();
+  if (marketCache.data && now - marketCache.at < 15 * 60 * 1000) return res.json(marketCache.data);
+  const data = await Promise.all(marketAssets.map(marketAsset));
+  marketCache.at = now;
+  marketCache.data = data;
+  res.json(data);
+});
+
 crudRoutes('tasks', 'task', (body) => ({
   title: body.title,
   category: body.category || 'Allgemein',

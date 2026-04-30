@@ -19,6 +19,7 @@ import {
   ShoppingCart,
   Sun,
   Trash2,
+  TrendingUp,
   Wallet
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -36,6 +37,7 @@ const nav = [
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
   { id: 'finance', label: 'Finanzen', icon: Wallet },
+  { id: 'stocks', label: 'Aktien', icon: TrendingUp },
   { id: 'settings', label: 'Einstellungen', icon: Settings }
 ];
 
@@ -327,6 +329,64 @@ function Finance({ api }) {
       <Card className="md:col-span-2"><ResponsiveContainer width="100%" height={260}><BarChart data={byCategory}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="category" /><YAxis /><Tooltip /><Bar dataKey="income" fill="#386641" /><Bar dataKey="expense" fill="#bc6c25" /></BarChart></ResponsiveContainer></Card>
       <List items={items} remove={remove} render={(item) => `${item.type === 'income' ? '+' : '-'} ${item.amount} EUR - ${item.category}`} />
     </Module>
+  );
+}
+
+function Stocks({ api }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadMarkets() {
+    setLoading(true);
+    try {
+      setItems(await api.request('markets'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMarkets().catch(() => {
+      setItems([]);
+      setLoading(false);
+    });
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Aktien & Märkte</h2>
+            <p className="mt-1 text-xs text-zinc-500">Quelle: Alpha Vantage. Indizes werden teils über ETF-Proxys angezeigt.</p>
+          </div>
+          <Button type="button" onClick={loadMarkets} disabled={loading}>{loading ? 'Lade...' : 'Aktualisieren'}</Button>
+        </div>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => (
+          <Card key={item.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">{item.name}</h3>
+                <p className="mt-1 text-xs text-zinc-500">{item.note || item.unit}</p>
+              </div>
+              <TrendingUp className={`h-5 w-5 ${Number(item.changePercent) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+            </div>
+            <p className="mt-4 text-2xl font-bold">{item.value ? new Intl.NumberFormat('de-AT', { maximumFractionDigits: item.value < 1 ? 5 : 2 }).format(item.value) : '-'}</p>
+            <p className="mt-1 text-sm text-zinc-500">{item.unit}</p>
+            {item.changePercent != null && (
+              <p className={`mt-2 text-sm font-medium ${Number(item.changePercent) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {Number(item.changePercent) >= 0 ? '+' : ''}{Number(item.changePercent).toFixed(2)}%
+              </p>
+            )}
+            <p className="mt-3 text-xs text-zinc-500">Stand: {item.updatedAt || 'offen'} · Quelle: {item.source || 'Alpha Vantage'}</p>
+            {item.status && <p className="mt-2 text-xs text-red-600">{item.status}</p>}
+          </Card>
+        ))}
+        {!items.length && <Card><p className="text-sm text-zinc-500">Keine Marktdaten geladen. Prüfe `ALPHAVANTAGE_API_KEY` in Render.</p></Card>}
+      </div>
+    </div>
   );
 }
 
@@ -1371,6 +1431,7 @@ function App() {
     news: <News api={api} />,
     travel: <Travel api={api} />,
     finance: <Finance api={api} />,
+    stocks: <Stocks api={api} />,
     settings: <SettingsPage api={api} />
   };
   const mainNav = nav.filter((item) => item.id !== 'settings');
