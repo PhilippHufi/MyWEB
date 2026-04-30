@@ -19,10 +19,8 @@ import {
   ShoppingCart,
   Sun,
   Trash2,
-  TrendingUp,
-  Wallet
+  TrendingUp
 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import './styles.css';
 
 const API = import.meta.env.VITE_API_URL || '/api';
@@ -36,13 +34,11 @@ const nav = [
   { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
-  { id: 'finance', label: 'Finanzen', icon: Wallet },
   { id: 'stocks', label: 'Aktien', icon: TrendingUp },
   { id: 'settings', label: 'Einstellungen', icon: Settings }
 ];
 
 const defaults = {
-  finance: [],
   tasks: [],
   gifts: [],
   'media/favorites': [],
@@ -310,28 +306,6 @@ function Dashboard({ api }) {
   );
 }
 
-function Finance({ api }) {
-  const { items, add, remove } = useCollection(api, 'finance');
-  const [form, setForm] = useState({ type: 'expense', category: 'Lebensmittel', amount: '', description: '', date: new Date().toISOString().slice(0, 10) });
-  const byCategory = Object.values(items.reduce((acc, item) => {
-    acc[item.category] ||= { category: item.category, income: 0, expense: 0 };
-    acc[item.category][item.type] += Number(item.amount);
-    return acc;
-  }, {}));
-
-  return (
-    <Module title="Finanzen" onSubmit={() => add(form)} form={form} setForm={setForm}>
-      <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="expense">Ausgabe</option><option value="income">Einnahme</option></Select>
-      <TextInput value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategorie" />
-      <TextInput value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} type="number" step="0.01" placeholder="Betrag" />
-      <TextInput value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} type="date" />
-      <TextInput value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Beschreibung" />
-      <Card className="md:col-span-2"><ResponsiveContainer width="100%" height={260}><BarChart data={byCategory}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="category" /><YAxis /><Tooltip /><Bar dataKey="income" fill="#386641" /><Bar dataKey="expense" fill="#bc6c25" /></BarChart></ResponsiveContainer></Card>
-      <List items={items} remove={remove} render={(item) => `${item.type === 'income' ? '+' : '-'} ${item.amount} EUR - ${item.category}`} />
-    </Module>
-  );
-}
-
 function Stocks({ api }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -395,6 +369,12 @@ function Tasks({ api }) {
   const emptyForm = { title: '', notes: '' };
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null);
+  const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:task-trash') || '[]'));
+
+  function setTrashItems(next) {
+    setTrash(next);
+    localStorage.setItem('pd:task-trash', JSON.stringify(next));
+  }
 
   async function saveTask() {
     const payload = { ...form, category: 'Allgemein', priority: 'mittel', dueDate: '', completed: editing?.completed || false };
@@ -410,6 +390,17 @@ function Tasks({ api }) {
   function editTask(item) {
     setEditing(item);
     setForm({ title: item.title || '', notes: item.notes || '' });
+  }
+
+  async function removeTask(item) {
+    setTrashItems([{ ...item, deletedAt: new Date().toISOString() }, ...trash.filter((entry) => entry.id !== item.id)]);
+    await remove(item.id);
+  }
+
+  async function restoreTask(item) {
+    const { id, createdAt, deletedAt, ...restored } = item;
+    await add(restored);
+    setTrashItems(trash.filter((entry) => entry.id !== item.id));
   }
 
   return (
@@ -434,13 +425,31 @@ function Tasks({ api }) {
                 </label>
                 <div className="flex gap-2">
                   <Button type="button" className="bg-zinc-700" onClick={() => editTask(item)}>Bearbeiten</Button>
-                  <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" className="icon-btn" onClick={() => removeTask(item)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
               {item.notes && <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-300">{item.notes}</p>}
             </div>
           ))}
           {!items.length && <p className="text-sm text-zinc-500">Noch keine To-dos.</p>}
+        </div>
+      </Card>
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">To-do Papierkorb</h2>
+          <Button type="button" disabled={!trash.length} onClick={() => window.confirm('To-do Papierkorb wirklich komplett leeren?') && setTrashItems([])}>Papierkorb leeren</Button>
+        </div>
+        <div className="space-y-2">
+          {trash.map((item) => (
+            <div key={`${item.id}-${item.deletedAt}`} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <div>
+                <p className="font-medium">{item.title}</p>
+                {item.notes && <p className="text-xs text-zinc-500">{item.notes}</p>}
+              </div>
+              <Button type="button" onClick={() => restoreTask(item)}>Wiederherstellen</Button>
+            </div>
+          ))}
+          {!trash.length && <p className="text-sm text-zinc-500">Keine gelöschten To-dos.</p>}
         </div>
       </Card>
     </div>
@@ -1516,7 +1525,6 @@ function App() {
     media: <Media api={api} />,
     news: <News api={api} />,
     travel: <Travel api={api} />,
-    finance: <Finance api={api} />,
     stocks: <Stocks api={api} />,
     settings: <SettingsPage api={api} />
   };
