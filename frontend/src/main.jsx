@@ -518,6 +518,7 @@ function Media({ api }) {
   const [topMovies, setTopMovies] = useState([]);
   const [futureMovies, setFutureMovies] = useState([]);
   const [results, setResults] = useState([]);
+  const [selectedMovie, setSelectedMovie] = useState(null);
   const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:media-trash') || '[]'));
   const tmdbGenres = [
     { label: 'Alle Genres', genreId: '', keyword: '' },
@@ -597,11 +598,12 @@ function Media({ api }) {
   return (
     <div className="space-y-5">
       <Card>
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-5">
           <Button type="button" className={tab === 'search' ? '' : 'bg-zinc-600'} onClick={() => setTab('search')}>Suche</Button>
           <Button type="button" className={tab === 'top' ? '' : 'bg-zinc-600'} onClick={() => setTab('top')}>Toplisten</Button>
           <Button type="button" className={tab === 'favorites' ? '' : 'bg-zinc-600'} onClick={() => setTab('favorites')}>Meine Favoriten</Button>
           <Button type="button" className={tab === 'future' ? '' : 'bg-zinc-600'} onClick={() => setTab('future')}>Zukunft</Button>
+          <Button type="button" className={tab === 'details' ? '' : 'bg-zinc-600'} onClick={() => setTab('details')} disabled={!selectedMovie}>Details</Button>
         </div>
       </Card>
       {tab === 'search' && (
@@ -655,7 +657,17 @@ function Media({ api }) {
       )}
       {(tab === 'search' || tab === 'top' || tab === 'future') && (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => <MediaCard key={`${tab}-${item.externalId}`} item={item} onSave={() => saveFavorite(item)} />)}
+        {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => (
+          <MediaCard
+            key={`${tab}-${item.externalId}`}
+            item={item}
+            onSave={() => saveFavorite(item)}
+            onDetails={() => {
+              setSelectedMovie(item);
+              setTab('details');
+            }}
+          />
+        ))}
       </div>
       )}
       {tab === 'favorites' && (
@@ -671,7 +683,19 @@ function Media({ api }) {
           <Card key={person} className="p-3">
             <h3 className="mb-3 font-semibold">{person}</h3>
             <div className="space-y-3">
-              {favoritesByPerson[person].map((item) => <MediaCard key={item.id} item={item} onDelete={() => removeFavorite(item)} onUpdate={(patch) => favs.update(item.id, patch)} compact />)}
+              {favoritesByPerson[person].map((item) => (
+                <MediaCard
+                  key={item.id}
+                  item={item}
+                  onDelete={() => removeFavorite(item)}
+                  onUpdate={(patch) => favs.update(item.id, patch)}
+                  onDetails={() => {
+                    setSelectedMovie(item);
+                    setTab('details');
+                  }}
+                  compact
+                />
+              ))}
               {!favoritesByPerson[person].length && <p className="text-sm text-zinc-500">Keine Filme.</p>}
             </div>
           </Card>
@@ -691,11 +715,12 @@ function Media({ api }) {
       </Card>
         </>
       )}
+      {tab === 'details' && selectedMovie && <MovieDetails item={selectedMovie} onSave={() => saveFavorite(selectedMovie)} />}
     </div>
   );
 }
 
-function MediaCard({ item, onSave, onDelete, onUpdate, compact = false }) {
+function MediaCard({ item, onSave, onDelete, onUpdate, onDetails, compact = false }) {
   const [open, setOpen] = useState(false);
   const rating = item.rating == null ? null : Math.round(Number(item.rating) / 2);
   const personalRatings = ['Weltklasse', 'Gut', 'Mittel', 'Schlecht', 'Katastrophe'];
@@ -744,9 +769,57 @@ function MediaCard({ item, onSave, onDelete, onUpdate, compact = false }) {
           )}
         </div>
       )}
-      <div className="flex gap-2 px-3 pb-3">
+      <div className="flex flex-wrap gap-2 px-3 pb-3">
         {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700" title="Trailer auf YouTube öffnen"><Play className="h-4 w-4 fill-white" />YouTube</Button>}
+        {onDetails && <Button type="button" onClick={onDetails} className="bg-zinc-700 hover:bg-zinc-800">Details öffnen</Button>}
         <Button onClick={onSave || onDelete}>{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
+      </div>
+    </Card>
+  );
+}
+
+function MovieDetails({ item, onSave }) {
+  const money = new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  const detailRows = [
+    ['Erscheinungsdatum', item.releaseDate ? new Date(`${item.releaseDate}T00:00:00`).toLocaleDateString('de-AT') : item.releaseYear],
+    ['Bewertung', item.rating == null ? null : `${Number(item.rating).toFixed(1)} / 10`],
+    ['Popularität', item.popularity == null ? null : Math.round(Number(item.popularity))],
+    ['Genre', item.genres],
+    ['Schauspieler', item.actors],
+    ['Regisseur', item.director],
+    ['Herkunftsland', item.countries],
+    ['Laufzeit', item.runtime ? `${item.runtime} Minuten` : null],
+    ['Originalsprache', item.originalLanguage],
+    ['Budget', item.budget ? money.format(item.budget) : null],
+    ['Einspielergebnis', item.revenue ? money.format(item.revenue) : null]
+  ];
+
+  return (
+    <Card className="border-zinc-300">
+      <div className="grid gap-5 lg:grid-cols-[180px_1fr]">
+        {item.imageUrl && <img src={item.imageUrl} alt="" className="w-40 rounded-md object-cover lg:w-full" />}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">{item.title}</h2>
+            <p className="mt-2 text-sm text-zinc-500">{item.description || 'Keine Beschreibung vorhanden.'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {item.trailerUrl && (
+              <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700">
+                <Play className="h-4 w-4 fill-white" />YouTube
+              </Button>
+            )}
+            <Button type="button" onClick={onSave}><Plus className="h-4 w-4" />Speichern</Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {detailRows.map(([label, value]) => (
+              <div key={label} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                <p className="text-xs font-medium uppercase text-zinc-500">{label}</p>
+                <p className="mt-1 text-zinc-900 dark:text-zinc-100">{value || '-'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </Card>
   );

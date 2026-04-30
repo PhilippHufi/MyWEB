@@ -56,6 +56,12 @@ model FavoriteMedia {
   releaseYear   String?
   genres        String?
   actors        String?
+  director      String?
+  countries     String?
+  runtime       Int?
+  originalLanguage String?
+  budget        Float?
+  revenue       Float?
   trailerUrl    String?
   rating        Float?
   popularity    Float?

@@ -428,6 +428,41 @@ function mapMovie(movie, genres = new Map()) {
   };
 }
 
+async function tmdbMovieDetails(movie) {
+  const detailsUrl = new URL(`https://api.themoviedb.org/3/movie/${movie.id}`);
+  detailsUrl.searchParams.set('language', 'de-DE');
+  detailsUrl.searchParams.set('api_key', process.env.TMDB_API_KEY);
+  detailsUrl.searchParams.set('append_to_response', 'credits,videos');
+  const response = await fetch(detailsUrl);
+  if (!response.ok) return null;
+  const details = await response.json();
+  const trailer = (details.videos?.results || []).find((video) => video.site === 'YouTube' && /Trailer/i.test(video.type));
+  const directors = (details.credits?.crew || []).filter((person) => person.job === 'Director').map((person) => person.name);
+  return {
+    source: 'tmdb',
+    externalId: String(details.id || movie.id),
+    mediaType: 'movie',
+    title: details.title || movie.title,
+    imageUrl: details.poster_path ? `https://image.tmdb.org/t/p/w342${details.poster_path}` : movie.imageUrl || null,
+    description: details.overview || movie.overview || movie.description,
+    releaseYear: (details.release_date || movie.release_date || '').slice(0, 4) || null,
+    releaseDate: details.release_date || movie.releaseDate || null,
+    genres: (details.genres || []).map((genre) => genre.name).join(', ') || movie.genres || '',
+    actors: (details.credits?.cast || []).slice(0, 10).map((actor) => actor.name).join(', '),
+    director: directors.join(', '),
+    countries: (details.production_countries || []).map((country) => country.name).join(', '),
+    runtime: details.runtime || null,
+    originalLanguage: details.original_language || null,
+    budget: details.budget || null,
+    revenue: details.revenue || null,
+    trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
+    rating: typeof details.vote_average === 'number' ? details.vote_average : movie.rating || null,
+    popularity: typeof details.popularity === 'number' ? details.popularity : movie.popularity || null,
+    watched: false,
+    audience: 'Für mich'
+  };
+}
+
 function crudRoutes(path, model, mapInput = (body) => body, include) {
   app.get(`/api/${path}`, auth, async (_req, res) => {
     const items = await prisma[model].findMany({ orderBy: { id: 'desc' }, include });
@@ -547,6 +582,12 @@ crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   releaseYear: body.releaseYear || null,
   genres: Array.isArray(body.genres) ? body.genres.join(', ') : body.genres || null,
   actors: Array.isArray(body.actors) ? body.actors.join(', ') : body.actors || null,
+  director: body.director || null,
+  countries: Array.isArray(body.countries) ? body.countries.join(', ') : body.countries || null,
+  runtime: body.runtime === '' || body.runtime == null ? null : Number(body.runtime),
+  originalLanguage: body.originalLanguage || null,
+  budget: body.budget === '' || body.budget == null ? null : Number(body.budget),
+  revenue: body.revenue === '' || body.revenue == null ? null : Number(body.revenue),
   trailerUrl: body.trailerUrl || null,
   rating: body.rating === '' || body.rating == null ? null : Number(body.rating),
   popularity: body.popularity === '' || body.popularity == null ? null : Number(body.popularity),
@@ -715,6 +756,7 @@ app.get('/api/media/search', auth, async (req, res) => {
           if (!detailsResponse.ok) throw new Error('TMDB details failed');
           const details = await detailsResponse.json();
           const trailer = (details.videos?.results || []).find((video) => video.site === 'YouTube' && /Trailer/i.test(video.type));
+          const directors = (details.credits?.crew || []).filter((person) => person.job === 'Director').map((person) => person.name);
           return {
             source: 'tmdb',
             externalId: String(movie.id),
@@ -725,6 +767,12 @@ app.get('/api/media/search', auth, async (req, res) => {
             releaseYear: (details.release_date || movie.release_date || '').slice(0, 4) || null,
             genres: (details.genres || []).map((genre) => genre.name).join(', '),
             actors: (details.credits?.cast || []).slice(0, 6).map((actor) => actor.name).join(', '),
+            director: directors.join(', '),
+            countries: (details.production_countries || []).map((country) => country.name).join(', '),
+            runtime: details.runtime || null,
+            originalLanguage: details.original_language || null,
+            budget: details.budget || null,
+            revenue: details.revenue || null,
             trailerUrl: trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null,
             rating: typeof details.vote_average === 'number' ? details.vote_average : null,
             popularity: typeof details.popularity === 'number' ? details.popularity : null,
@@ -821,7 +869,12 @@ app.get('/api/media/discover', auth, async (req, res) => {
       const response = await fetch(url);
       if (!response.ok) throw new Error('TMDB discover failed');
       const data = await response.json();
-      results.push(...(data.results || []).map((movie) => mapMovie(movie, genres)));
+      const mapped = (data.results || []).map((movie) => mapMovie(movie, genres));
+      const detailed = await Promise.all(mapped.map(async (movie) => {
+        const detail = await tmdbMovieDetails({ id: movie.externalId, ...movie }).catch(() => null);
+        return detail || movie;
+      }));
+      results.push(...detailed);
     }
 
     res.json(results.slice(0, limit));
