@@ -15,7 +15,15 @@ dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
-const rssParser = new Parser();
+const rssParser = new Parser({
+  customFields: {
+    item: [
+      ['media:content', 'mediaContent'],
+      ['media:thumbnail', 'mediaThumbnail'],
+      ['content:encoded', 'contentEncoded']
+    ]
+  }
+});
 const port = process.env.PORT || 4000;
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
 const __filename = fileURLToPath(import.meta.url);
@@ -297,6 +305,64 @@ function fallbackNews(scope = 'at', type = 'articles') {
     description,
     imageUrl
   }));
+}
+
+function stripHtml(value = '') {
+  return String(value)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function newsImage(scope, title) {
+  const label = scope === 'at' ? 'Österreich' : scope === 'de' ? 'Deutschland' : scope === 'us' ? 'Amerika' : 'Weltweit';
+  return placeholderImage(label, title || 'Nachrichten');
+}
+
+function imageFromFeedItem(item, scope) {
+  return item.enclosure?.url
+    || item.mediaContent?.$?.url
+    || item.mediaThumbnail?.$?.url
+    || newsImage(scope, item.title);
+}
+
+async function rssNews(scope) {
+  const sources = {
+    at: [
+      { source: 'ORF', url: 'https://rss.orf.at/news.xml' },
+      { source: 'ORF Österreich', url: 'https://rss.orf.at/oesterreich.xml' }
+    ],
+    de: [
+      { source: 'Tagesschau', url: 'https://www.tagesschau.de/xml/rss2/' }
+    ],
+    us: [
+      { source: 'Google News DE/USA', url: 'https://news.google.com/rss/search?q=USA&hl=de&gl=DE&ceid=DE:de' }
+    ],
+    world: [
+      { source: 'Tagesschau Welt', url: 'https://www.tagesschau.de/xml/rss2/' },
+      { source: 'Google News Welt', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=de&gl=DE&ceid=DE:de' }
+    ]
+  };
+
+  const feeds = await Promise.allSettled((sources[scope] || sources.de).map(async (source) => {
+    const feed = await rssParser.parseURL(source.url);
+    return (feed.items || []).slice(0, 12).map((item) => ({
+      title: item.title || 'Nachricht',
+      url: item.link,
+      source: source.source,
+      category: scope,
+      type: 'articles',
+      description: stripHtml(item.contentSnippet || item.summary || item.content || item.contentEncoded || 'Keine Kurzbeschreibung vorhanden.'),
+      imageUrl: imageFromFeedItem(item, scope),
+      publishedAt: item.isoDate || item.pubDate || null
+    }));
+  }));
+
+  return feeds
+    .flatMap((result) => result.status === 'fulfilled' ? result.value : [])
+    .filter((item, index, all) => item.url && all.findIndex((other) => other.url === item.url) === index)
+    .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
+    .slice(0, 20);
 }
 
 function fallbackWeatherDaily() {
@@ -770,6 +836,13 @@ app.get('/api/news', auth, async (req, res) => {
   const countries = { at: 'at', de: 'de', us: 'us' };
   if (type === 'audio') {
     return res.json(fallbackNews(scope, type));
+  }
+
+  try {
+    const rssItems = await rssNews(scope);
+    if (rssItems.length) return res.json(rssItems);
+  } catch (error) {
+    console.error(error);
   }
 
   if (process.env.NEWS_API_KEY) {
