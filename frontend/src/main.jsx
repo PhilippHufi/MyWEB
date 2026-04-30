@@ -570,8 +570,14 @@ function Media({ api }) {
   }
 
   const genres = ['Alle', ...Array.from(new Set(favs.items.flatMap((item) => (item.genres || '').split(',').map((name) => name.trim()).filter(Boolean))))];
-  const people = ['Für mich', 'Freundin', 'Familie', 'Brüder', 'Kinder'];
-  const audienceFilter = ['Alle', ...people];
+  const people = [
+    { value: 'Für mich', label: 'Meine Filme' },
+    { value: 'Freundin', label: 'Freundin' },
+    { value: 'Familie', label: 'Familie' },
+    { value: 'Brüder', label: 'Brüder' },
+    { value: 'Kinder', label: 'Kinder' }
+  ];
+  const audienceFilter = [{ value: 'Alle', label: 'Alle' }, ...people];
   const filteredFavorites = favs.items.filter((item) => {
     const genreMatch = genre === 'Alle' || (item.genres || '').split(',').map((name) => name.trim()).includes(genre);
     const actorMatch = !actor.trim() || (item.actors || '').toLowerCase().includes(actor.trim().toLowerCase());
@@ -579,8 +585,8 @@ function Media({ api }) {
     return genreMatch && actorMatch && audienceMatch;
   });
   const favoritesByPerson = people.reduce((acc, person) => {
-    acc[person] = filteredFavorites
-      .filter((item) => (item.audience || 'Für mich') === person)
+    acc[person.value] = filteredFavorites
+      .filter((item) => (item.audience || 'Für mich') === person.value)
       .sort((a, b) => Number(Boolean(a.watched)) - Number(Boolean(b.watched)));
     return acc;
   }, {});
@@ -676,14 +682,14 @@ function Media({ api }) {
         <h2 className="font-semibold">Meine Favoriten</h2>
         <Select value={genre} onChange={(e) => setGenre(e.target.value)}>{genres.map((name) => <option key={name}>{name}</option>)}</Select>
         <TextInput value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Nach Schauspieler filtern" />
-        <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audienceFilter.map((name) => <option key={name}>{name}</option>)}</Select>
+        <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audienceFilter.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}</Select>
       </div>
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="space-y-4">
         {people.map((person) => (
-          <Card key={person} className="p-3">
-            <h3 className="mb-3 font-semibold">{person}</h3>
-            <div className="space-y-3">
-              {favoritesByPerson[person].map((item) => (
+          <Card key={person.value} className="p-3">
+            <h3 className="mb-3 font-semibold">{person.label}</h3>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {favoritesByPerson[person.value].map((item) => (
                 <MediaCard
                   key={item.id}
                   item={item}
@@ -696,7 +702,7 @@ function Media({ api }) {
                   compact
                 />
               ))}
-              {!favoritesByPerson[person].length && <p className="text-sm text-zinc-500">Keine Filme.</p>}
+              {!favoritesByPerson[person.value].length && <p className="text-sm text-zinc-500">Keine Filme.</p>}
             </div>
           </Card>
         ))}
@@ -724,6 +730,7 @@ function MediaCard({ item, onSave, onDelete, onUpdate, onDetails, compact = fals
   const [open, setOpen] = useState(false);
   const rating = item.rating == null ? null : Math.round(Number(item.rating) / 2);
   const personalRatings = ['Weltklasse', 'Gut', 'Mittel', 'Schlecht', 'Katastrophe'];
+  const audienceLabel = (item.audience || 'Für mich') === 'Für mich' ? 'Meine Filme' : item.audience;
   return (
     <Card className={`overflow-hidden border-zinc-300 p-0 ${item.watched ? 'opacity-55 grayscale' : ''}`}>
       <div className="flex gap-3 p-3">
@@ -731,7 +738,7 @@ function MediaCard({ item, onSave, onDelete, onUpdate, onDetails, compact = fals
         <button type="button" onClick={() => setOpen(!open)} className="min-w-0 flex-1 text-left">
           <h3 className="font-semibold leading-tight">{item.title}</h3>
           <p className="mt-1 text-sm text-zinc-500">
-          {[item.releaseYear, item.audience, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
+          {[item.releaseYear, audienceLabel, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
           </p>
           <div className="mt-2 text-sm">
             <span className="text-zinc-500">Bewertung: </span>
@@ -754,11 +761,11 @@ function MediaCard({ item, onSave, onDelete, onUpdate, onDetails, compact = fals
               <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(item.watched)} onChange={(e) => onUpdate({ watched: e.target.checked })} /> Bereits gesehen</label>
               <label className="block text-xs font-medium text-zinc-500">Für:</label>
               <Select value={item.audience || 'Für mich'} onChange={(e) => onUpdate({ audience: e.target.value })}>
-                <option>Für mich</option>
-                <option>Freundin</option>
-                <option>Familie</option>
-                <option>Brüder</option>
-                <option>Kinder</option>
+                <option value="Für mich">Meine Filme</option>
+                <option value="Freundin">Freundin</option>
+                <option value="Familie">Familie</option>
+                <option value="Brüder">Brüder</option>
+                <option value="Kinder">Kinder</option>
               </Select>
               <label className="block text-xs font-medium text-zinc-500">Eigene Bewertung:</label>
               <Select value={item.personalRating || ''} onChange={(e) => onUpdate({ personalRating: e.target.value })}>
