@@ -660,32 +660,45 @@ app.get('/api/media/discover', auth, async (req, res) => {
     const mode = String(req.query.mode || 'current');
     const region = String(req.query.region || 'world');
     const sort = String(req.query.sort || 'popularity');
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit || 30)));
+    const genreId = String(req.query.genreId || '');
     const year = mode === 'previous' ? now.getFullYear() - 1 : now.getFullYear();
-    const url = new URL('https://api.themoviedb.org/3/discover/movie');
-    url.searchParams.set('language', 'de-DE');
-    url.searchParams.set('api_key', process.env.TMDB_API_KEY);
-    url.searchParams.set('include_adult', 'false');
-    url.searchParams.set('page', '1');
-    url.searchParams.set('vote_count.gte', sort === 'rating' ? '50' : '10');
-    url.searchParams.set('sort_by', mode === 'next_year' ? 'primary_release_date.asc' : movieSort(sort));
+    const genres = await tmdbGenres();
+    const results = [];
+    const pages = Math.ceil(limit / 20);
 
-    if (mode === 'next_year') {
-      const nextYear = now.getFullYear() + 1;
-      url.searchParams.set('primary_release_date.gte', `${nextYear}-01-01`);
-      url.searchParams.set('primary_release_date.lte', `${nextYear}-12-31`);
-    } else {
-      url.searchParams.set('primary_release_year', String(year));
+    for (let page = 1; page <= pages; page += 1) {
+      const url = new URL('https://api.themoviedb.org/3/discover/movie');
+      url.searchParams.set('language', 'de-DE');
+      url.searchParams.set('api_key', process.env.TMDB_API_KEY);
+      url.searchParams.set('include_adult', 'false');
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('vote_count.gte', sort === 'rating' ? '50' : '10');
+      url.searchParams.set('sort_by', mode === 'future' ? 'primary_release_date.asc' : movieSort(sort));
+      if (genreId) url.searchParams.set('with_genres', genreId);
+
+      if (mode === 'future') {
+        const start = now.toISOString().slice(0, 10);
+        const end = new Date(now);
+        end.setMonth(end.getMonth() + 12);
+        url.searchParams.set('primary_release_date.gte', start);
+        url.searchParams.set('primary_release_date.lte', end.toISOString().slice(0, 10));
+      } else {
+        url.searchParams.set('primary_release_year', String(year));
+      }
+
+      if (region === 'AT' || region === 'US') {
+        url.searchParams.set('region', region);
+        url.searchParams.set('with_release_type', '2|3');
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('TMDB discover failed');
+      const data = await response.json();
+      results.push(...(data.results || []).map((movie) => mapMovie(movie, genres)));
     }
 
-    if (region === 'AT' || region === 'US') {
-      url.searchParams.set('region', region);
-      url.searchParams.set('with_release_type', '2|3');
-    }
-
-    const [response, genres] = await Promise.all([fetch(url), tmdbGenres()]);
-    if (!response.ok) throw new Error('TMDB discover failed');
-    const data = await response.json();
-    res.json((data.results || []).slice(0, 30).map((movie) => mapMovie(movie, genres)));
+    res.json(results.slice(0, limit));
   } catch (error) {
     console.error(error);
     res.json([]);

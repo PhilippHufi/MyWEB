@@ -31,7 +31,7 @@ const nav = [
   { id: 'shopping', label: 'Shopping', icon: ShoppingCart },
   { id: 'gifts', label: 'Geschenke', icon: Gift },
   { id: 'invoices', label: 'Rechnungen', icon: ReceiptText },
-  { id: 'media', label: 'Filme & Musik', icon: Film },
+  { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
   { id: 'finance', label: 'Finanzen', icon: Wallet }
@@ -220,24 +220,29 @@ function useCollection(api, name) {
 }
 
 function Dashboard({ api }) {
-  const [data, setData] = useState(null);
   const [weather, setWeather] = useState(null);
   const [traffic, setTraffic] = useState([]);
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const weekNumber = Math.ceil((((weekStart - new Date(weekStart.getFullYear(), 0, 1)) / 86400000) + new Date(weekStart.getFullYear(), 0, 1).getDay() + 1) / 7);
 
   useEffect(() => {
-    api.request('dashboard').then(setData).catch(() => {});
     api.request('weather').then(setWeather).catch(() => setWeather(fallbackWeather()));
     api.request('traffic').then(setTraffic).catch(() => setTraffic([{ title: 'A1 Oberoesterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsdaten gerade nicht erreichbar.' }]));
   }, []);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-4">
-        <Metric label="Kontostand" value={`${(data?.finance?.balance || 0).toFixed(2)} EUR`} />
-        <Metric label="Offene Aufgaben" value={data?.tasks?.length || 0} />
-        <Metric label="Reisen" value={data?.trips?.length || 0} />
-        <Metric label="Favoriten" value={data?.favorites || 0} />
-      </div>
+      <Card>
+        <p className="text-sm text-zinc-500">Kalenderwoche</p>
+        <h2 className="mt-1 text-2xl font-semibold">KW {weekNumber}</h2>
+        <p className="mt-1 text-zinc-600 dark:text-zinc-300">
+          {weekStart.toLocaleDateString('de-AT')} bis {weekEnd.toLocaleDateString('de-AT')}
+        </p>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <h2 className="font-semibold">Diese Woche{weather?.label ? ` - ${weather.label}` : ''}</h2>
@@ -265,10 +270,6 @@ function Dashboard({ api }) {
       </div>
     </div>
   );
-}
-
-function Metric({ label, value }) {
-  return <Card><p className="text-sm text-zinc-500">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p></Card>;
 }
 
 function Finance({ api }) {
@@ -349,7 +350,7 @@ function Gifts({ api }) {
                       <div className="font-medium">{item.name}</div>
                       <div className="text-zinc-500">{item.status}{item.price ? ` - ${item.price} EUR` : ''}{item.notes ? ` - ${item.notes}` : ''}</div>
                     </div>
-                    <button type="button" className="icon-btn" onClick={() => removeGift(item)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" className="icon-btn" onClick={() => removeGift(item)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 ))}
               </div>
@@ -390,7 +391,7 @@ function Shopping({ api }) {
                       <input type="checkbox" checked={item.completed} onChange={(e) => update(item.id, { completed: e.target.checked })} />
                       <span className={item.completed ? 'line-through text-zinc-500' : ''}>{item.name}{item.quantity ? ` - ${item.quantity}` : ''}</span>
                     </label>
-                    <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 ))}
               </div>
@@ -489,7 +490,7 @@ function Invoices({ api }) {
                   </div>
                   <div className="flex gap-2">
                     <button type="button" className="icon-btn" onClick={() => downloadFile(`invoices/${item.id}/download`, item.originalName)} aria-label="Download"><Download className="h-4 w-4" /></button>
-                    <button type="button" className="icon-btn" onClick={() => removeInvoice(item)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                    <button type="button" className="icon-btn" onClick={() => removeInvoice(item)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               ))}
@@ -505,17 +506,34 @@ function Invoices({ api }) {
 function Media({ api }) {
   const favs = useCollection(api, 'media/favorites');
   const [query, setQuery] = useState('');
-  const [type, setType] = useState('movie');
+  const [tab, setTab] = useState('search');
   const [genre, setGenre] = useState('Alle');
   const [actor, setActor] = useState('');
   const [audience, setAudience] = useState('Alle');
   const [listMode, setListMode] = useState('current');
   const [region, setRegion] = useState('AT');
   const [sort, setSort] = useState('popularity');
-  const [viewMode, setViewMode] = useState('top');
+  const [limit, setLimit] = useState(50);
+  const [discoverGenre, setDiscoverGenre] = useState('');
   const [topMovies, setTopMovies] = useState([]);
+  const [futureMovies, setFutureMovies] = useState([]);
   const [results, setResults] = useState([]);
   const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:media-trash') || '[]'));
+  const tmdbGenres = [
+    ['Alle Genres', ''],
+    ['Action', '28'],
+    ['Abenteuer', '12'],
+    ['Animation', '16'],
+    ['Komödie', '35'],
+    ['Krimi', '80'],
+    ['Drama', '18'],
+    ['Familie', '10751'],
+    ['Fantasy', '14'],
+    ['Horror', '27'],
+    ['Romanze', '10749'],
+    ['Science Fiction', '878'],
+    ['Thriller', '53']
+  ];
 
   function setTrashItems(next) {
     setTrash(next);
@@ -536,10 +554,10 @@ function Media({ api }) {
   async function search(event) {
     event.preventDefault();
     try {
-      setViewMode('search');
-      setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=${type}`));
+      setTab('search');
+      setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=movie`));
     } catch {
-      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Für mich' }]);
+      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: 'movie', title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Für mich' }]);
     }
   }
 
@@ -553,30 +571,47 @@ function Media({ api }) {
   });
 
   useEffect(() => {
-    api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}`).then(setTopMovies).catch(() => setTopMovies([]));
-  }, [listMode, region, sort]);
+    api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}&limit=${limit}&genreId=${discoverGenre}`).then(setTopMovies).catch(() => setTopMovies([]));
+  }, [listMode, region, sort, limit, discoverGenre]);
+
+  useEffect(() => {
+    api.request(`media/discover?mode=future&region=world&sort=release_date&limit=100&genreId=${discoverGenre}`).then(setFutureMovies).catch(() => setFutureMovies([]));
+  }, [discoverGenre]);
 
   return (
     <div className="space-y-5">
+      <Card>
+        <div className="grid gap-2 sm:grid-cols-4">
+          <Button type="button" className={tab === 'search' ? '' : 'bg-zinc-600'} onClick={() => setTab('search')}>Suche</Button>
+          <Button type="button" className={tab === 'top' ? '' : 'bg-zinc-600'} onClick={() => setTab('top')}>Toplisten</Button>
+          <Button type="button" className={tab === 'favorites' ? '' : 'bg-zinc-600'} onClick={() => setTab('favorites')}>Meine Favoriten</Button>
+          <Button type="button" className={tab === 'future' ? '' : 'bg-zinc-600'} onClick={() => setTab('future')}>Zukunft</Button>
+        </div>
+      </Card>
+      {tab === 'search' && (
       <Card className="border-zinc-300">
-        <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_150px_auto]">
+        <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_auto]">
           <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Film oder Schauspieler suchen" />
-          <Select value={type} onChange={(e) => setType(e.target.value)}><option value="movie">Film</option><option value="music">Musik</option></Select>
           <Button><Search className="h-4 w-4" />Suchen</Button>
         </form>
       </Card>
+      )}
+      {tab === 'top' && (
       <Card className="border-zinc-300">
-        <div className="mb-3 flex gap-2">
-          <Button type="button" className={viewMode === 'top' ? '' : 'bg-zinc-600'} onClick={() => setViewMode('top')}>Toplisten</Button>
-          <Button type="button" className={viewMode === 'search' ? '' : 'bg-zinc-600'} onClick={() => setViewMode('search')}>Suche</Button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-[1fr_160px_190px]">
-          <Select value={listMode} onChange={(e) => setListMode(e.target.value)}>
-            <option value="current">Top 30 aktuell</option>
-            <option value="previous">Top 30 Vorjahr</option>
-            <option value="next_year">Filme nächstes Jahr</option>
+        <div className="grid gap-3 md:grid-cols-5">
+          <Select value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+            <option value={50}>Top 50</option>
+            <option value={100}>Top 100</option>
+            <option value={200}>Top 200</option>
           </Select>
-          <Select value={region} onChange={(e) => setRegion(e.target.value)} disabled={listMode === 'next_year'}>
+          <Select value={discoverGenre} onChange={(e) => setDiscoverGenre(e.target.value)}>
+            {tmdbGenres.map(([label, id]) => <option key={id || 'all'} value={id}>{label}</option>)}
+          </Select>
+          <Select value={listMode} onChange={(e) => setListMode(e.target.value)}>
+            <option value="current">Aktuell</option>
+            <option value="previous">Vorjahr</option>
+          </Select>
+          <Select value={region} onChange={(e) => setRegion(e.target.value)}>
             <option value="AT">Österreich</option>
             <option value="world">Weltweit</option>
             <option value="US">Amerika</option>
@@ -588,11 +623,29 @@ function Media({ api }) {
           </Select>
         </div>
       </Card>
+      )}
+      {tab === 'future' && (
+        <Card className="border-zinc-300">
+          <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+            <div>
+              <h2 className="font-semibold">Filme der nächsten 12 Monate</h2>
+              <p className="text-sm text-zinc-500">Geplante Veröffentlichungen, nach Erscheinungsdatum sortiert.</p>
+            </div>
+            <Select value={discoverGenre} onChange={(e) => setDiscoverGenre(e.target.value)}>
+              {tmdbGenres.map(([label, id]) => <option key={id || 'all'} value={id}>{label}</option>)}
+            </Select>
+          </div>
+        </Card>
+      )}
+      {(tab === 'search' || tab === 'top' || tab === 'future') && (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {(viewMode === 'top' ? topMovies : results).map((item) => <MediaCard key={`${viewMode}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
+        {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => <MediaCard key={`${tab}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
       </div>
+      )}
+      {tab === 'favorites' && (
+        <>
       <div className="grid gap-3 border-t border-zinc-200 pt-4 md:grid-cols-[1fr_1fr_1fr] dark:border-zinc-800">
-        <h2 className="font-semibold">Favoriten</h2>
+        <h2 className="font-semibold">Meine Favoriten</h2>
         <Select value={genre} onChange={(e) => setGenre(e.target.value)}>{genres.map((name) => <option key={name}>{name}</option>)}</Select>
         <TextInput value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Nach Schauspieler filtern" />
         <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audiences.map((name) => <option key={name}>{name}</option>)}</Select>
@@ -612,6 +665,8 @@ function Media({ api }) {
           {!trash.length && <p className="text-sm text-zinc-500">Keine entfernten Filme.</p>}
         </div>
       </Card>
+        </>
+      )}
     </div>
   );
 }
@@ -619,7 +674,6 @@ function Media({ api }) {
 function MediaCard({ item, onSave, onDelete, onUpdate }) {
   const [open, setOpen] = useState(false);
   const rating = item.rating == null ? null : Math.round(Number(item.rating) / 2);
-  const popularity = Math.min(100, Math.round(Number(item.popularity || 0)));
   return (
     <Card className="overflow-hidden border-zinc-300 p-0">
       <div className="flex gap-3 p-3">
@@ -629,12 +683,11 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
           <p className="mt-1 text-sm text-zinc-500">
           {[item.releaseYear, item.audience, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
           </p>
-          <div className="mt-2 text-amber-500">{rating == null ? 'Bewertung offen' : '★★★★★'.split('').map((star, index) => <span key={index} className={index < rating ? '' : 'text-zinc-300'}>{star}</span>)}</div>
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            <span className="text-red-600">☹</span>
-            <div className="h-2 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-700"><div className="h-2 rounded-full bg-green-600" style={{ width: `${popularity}%` }} /></div>
-            <span className="text-green-600">☺</span>
+          <div className="mt-2 text-sm">
+            <span className="text-zinc-500">Bewertung: </span>
+            <span className="text-amber-500">{rating == null ? 'offen' : '★★★★★'.split('').map((star, index) => <span key={index} className={index < rating ? '' : 'text-zinc-300'}>{star}</span>)}</span>
           </div>
+          {item.popularity != null && <p className="mt-1 text-sm text-zinc-500">Popularität: {Math.round(Number(item.popularity))}</p>}
         </button>
       </div>
       <div className="px-3 pb-3">
@@ -684,7 +737,7 @@ function News({ api }) {
       <Card>
         <div className="grid gap-3 md:grid-cols-2">
           <Select value={scope} onChange={(e) => setScope(e.target.value)}>
-            <option value="at">Oesterreich</option>
+            <option value="at">Österreich</option>
             <option value="de">Deutschland</option>
             <option value="us">Amerika</option>
             <option value="world">Weltweit</option>
@@ -718,12 +771,12 @@ function News({ api }) {
             <div key={item.id} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
               <div className="flex items-center justify-between gap-3">
                 <button type="button" className="min-w-0 text-left font-medium" onClick={() => setOpenSaved(openSaved === item.id ? null : item.id)}>{item.title}</button>
-                <button type="button" className="icon-btn" onClick={() => bookmarks.remove(item.id)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" className="icon-btn" onClick={() => bookmarks.remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
               {openSaved === item.id && (
                 <div className="mt-3 space-y-2 text-zinc-600 dark:text-zinc-300">
                   <p>{item.description || 'Keine Beschreibung gespeichert.'}</p>
-                  <a href={item.url} target="_blank" rel="noreferrer" className="underline">{item.type === 'audio' ? 'Audio oeffnen' : 'Artikel oeffnen'}</a>
+                  <a href={item.url} target="_blank" rel="noreferrer" className="underline">{item.type === 'audio' ? 'Audio öffnen' : 'Artikel öffnen'}</a>
                 </div>
               )}
             </div>
@@ -894,7 +947,7 @@ function Module({ title, children, onSubmit }) {
         <h2 className="mb-3 text-lg font-semibold">{title}</h2>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="grid gap-3 md:grid-cols-2">
           {children}
-          <Button className="md:col-span-2"><Plus className="h-4 w-4" />Hinzufuegen</Button>
+          <Button className="md:col-span-2"><Plus className="h-4 w-4" />Hinzufügen</Button>
         </form>
       </Card>
     </div>
@@ -908,7 +961,7 @@ function List({ items, remove, render }) {
         {items.map((item) => (
           <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
             <div>{render(item)}</div>
-            <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+            <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
         {!items.length && <p className="text-sm text-zinc-500">Noch keine Eintraege.</p>}
