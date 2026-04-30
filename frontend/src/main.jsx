@@ -23,12 +23,12 @@ const API = import.meta.env.VITE_API_URL || '/api';
 
 const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'finance', label: 'Finanzen', icon: Wallet },
   { id: 'tasks', label: 'To-do', icon: CheckSquare },
   { id: 'gifts', label: 'Geschenke', icon: Gift },
   { id: 'media', label: 'Filme & Musik', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
-  { id: 'travel', label: 'Urlaub', icon: Plane }
+  { id: 'travel', label: 'Urlaub', icon: Plane },
+  { id: 'finance', label: 'Finanzen', icon: Wallet }
 ];
 
 const defaults = {
@@ -201,7 +201,7 @@ function Dashboard({ api }) {
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h2 className="font-semibold">Diese Woche</h2>
+          <h2 className="font-semibold">Diese Woche{weather?.label ? ` - ${weather.label}` : ''}</h2>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {(weather?.daily?.time || []).map((day, index) => (
               <div key={day} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
@@ -217,7 +217,9 @@ function Dashboard({ api }) {
           <h2 className="font-semibold">A1 Oberoesterreich</h2>
           <div className="mt-3 space-y-2">
             {traffic.map((item, index) => (
-              <p key={index} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">{item.title}: {item.content}</p>
+              <p key={index} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                {item.link ? <a href={item.link} target="_blank" rel="noreferrer" className="font-medium underline">{item.title}</a> : <span className="font-medium">{item.title}</span>}: {item.content}
+              </p>
             ))}
           </div>
         </Card>
@@ -269,14 +271,55 @@ function Tasks({ api }) {
 function Gifts({ api }) {
   const { items, add, remove } = useCollection(api, 'gifts');
   const [form, setForm] = useState({ name: '', person: '', price: '', status: 'Idee', notes: '' });
+  const [search, setSearch] = useState('');
+  const filtered = items.filter((item) => `${item.person} ${item.name} ${item.status} ${item.notes || ''}`.toLowerCase().includes(search.toLowerCase()));
+  const grouped = filtered.reduce((acc, item) => {
+    const person = item.person || 'Ohne Person';
+    acc[person] ||= [];
+    acc[person].push(item);
+    return acc;
+  }, {});
+
+  function removeGift(item) {
+    if (window.confirm(`${item.name} fuer ${item.person} wirklich loeschen?`)) {
+      remove(item.id);
+    }
+  }
+
   return (
-    <Module title="Geschenkliste" onSubmit={() => add(form)} form={form} setForm={setForm}>
-      <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Geschenk" />
-      <TextInput value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value })} placeholder="Person" />
-      <TextInput value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} type="number" placeholder="Preis" />
-      <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Idee</option><option>Gekauft</option><option>Verpackt</option></Select>
-      <List items={items} remove={remove} render={(item) => `${item.name} fuer ${item.person} - ${item.status} ${item.price ? `(${item.price} EUR)` : ''}`} />
-    </Module>
+    <div className="space-y-4">
+      <Module title="Geschenkliste" onSubmit={() => add(form)} form={form} setForm={setForm}>
+        <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Geschenk" />
+        <TextInput value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value })} placeholder="Person" />
+        <TextInput value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} type="number" placeholder="Preis" />
+        <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Idee</option><option>Gekauft</option><option>Verpackt</option></Select>
+      </Module>
+      <Card>
+        <div className="mb-3 flex items-center gap-2">
+          <Search className="h-4 w-4 text-zinc-500" />
+          <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nach Person oder Geschenk suchen" />
+        </div>
+        <div className="space-y-4">
+          {Object.entries(grouped).map(([person, gifts]) => (
+            <section key={person}>
+              <h3 className="mb-2 font-semibold">{person}</h3>
+              <div className="space-y-2">
+                {gifts.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                    <div>
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-zinc-500">{item.status}{item.price ? ` - ${item.price} EUR` : ''}{item.notes ? ` - ${item.notes}` : ''}</div>
+                    </div>
+                    <button type="button" className="icon-btn" onClick={() => removeGift(item)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!filtered.length && <p className="text-sm text-zinc-500">Keine passenden Geschenke gefunden.</p>}
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -288,7 +331,11 @@ function Media({ api }) {
 
   async function search(event) {
     event.preventDefault();
-    setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=${type}`));
+    try {
+      setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=${type}`));
+    } catch {
+      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.' }]);
+    }
   }
 
   return (

@@ -42,6 +42,46 @@ function parseDate(value) {
   return value ? new Date(value) : null;
 }
 
+function fallbackNews(category) {
+  const items = {
+    technology: [
+      ['Tagesschau Technik', 'https://www.tagesschau.de/wirtschaft/technologie/', 'Aktuelle Technik- und Digitalthemen ohne NewsAPI-Key oeffnen.'],
+      ['Heise News', 'https://www.heise.de/news/', 'IT, Software, Hardware und Netzpolitik.']
+    ],
+    business: [
+      ['Tagesschau Wirtschaft', 'https://www.tagesschau.de/wirtschaft/', 'Aktuelle Wirtschaftsuebersicht ohne NewsAPI-Key oeffnen.'],
+      ['Finanzen.net', 'https://www.finanzen.net/', 'Boerse, Wirtschaft und Finanznachrichten.']
+    ],
+    health: [
+      ['Tagesschau Gesundheit', 'https://www.tagesschau.de/thema/gesundheit/', 'Gesundheitsthemen und aktuelle Meldungen.'],
+      ['Robert Koch-Institut', 'https://www.rki.de/', 'Offizielle Gesundheitsinformationen.']
+    ]
+  };
+  return (items[category] || items.technology).map(([title, url, description]) => ({
+    title,
+    url,
+    source: 'Fallback',
+    category,
+    description,
+    imageUrl: null
+  }));
+}
+
+function fallbackWeatherDaily() {
+  const today = new Date();
+  const time = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
+  return {
+    time,
+    temperature_2m_min: [8, 9, 7, 10, 11, 9, 8],
+    temperature_2m_max: [17, 18, 16, 20, 21, 19, 17],
+    precipitation_probability_max: [20, 35, 45, 15, 10, 25, 30]
+  };
+}
+
 function crudRoutes(path, model, mapInput = (body) => body, include) {
   app.get(`/api/${path}`, auth, async (_req, res) => {
     const items = await prisma[model].findMany({ orderBy: { id: 'desc' }, include });
@@ -177,20 +217,25 @@ app.get('/api/media/search', auth, async (req, res) => {
   if (!query) return res.json([]);
 
   if (type === 'movie' && process.env.TMDB_API_KEY) {
-    const url = new URL('https://api.themoviedb.org/3/search/movie');
-    url.searchParams.set('query', query);
-    url.searchParams.set('language', 'de-DE');
-    url.searchParams.set('api_key', process.env.TMDB_API_KEY);
-    const response = await fetch(url);
-    const data = await response.json();
-    return res.json((data.results || []).map((movie) => ({
-      source: 'tmdb',
-      externalId: String(movie.id),
-      mediaType: 'movie',
-      title: movie.title,
-      imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
-      description: movie.overview
-    })));
+    try {
+      const url = new URL('https://api.themoviedb.org/3/search/movie');
+      url.searchParams.set('query', query);
+      url.searchParams.set('language', 'de-DE');
+      url.searchParams.set('api_key', process.env.TMDB_API_KEY);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('TMDB request failed');
+      const data = await response.json();
+      return res.json((data.results || []).map((movie) => ({
+        source: 'tmdb',
+        externalId: String(movie.id),
+        mediaType: 'movie',
+        title: movie.title,
+        imageUrl: movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : null,
+        description: movie.overview
+      })));
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   res.json([
@@ -200,7 +245,9 @@ app.get('/api/media/search', auth, async (req, res) => {
       mediaType: type,
       title: query,
       imageUrl: null,
-      description: 'Kein API-Key konfiguriert. Du kannst diesen Treffer trotzdem als Favorit speichern.'
+      description: type === 'movie'
+        ? 'Film-Treffer manuell speichern. Fuer echte Filmsuche TMDB_API_KEY in Render setzen.'
+        : 'Musik-Treffer manuell speichern. Eine Musik-API ist noch nicht konfiguriert.'
     }
   ]);
 });
@@ -208,43 +255,66 @@ app.get('/api/media/search', auth, async (req, res) => {
 app.get('/api/news', auth, async (req, res) => {
   const category = String(req.query.category || 'technology');
   if (process.env.NEWS_API_KEY) {
-    const url = new URL('https://newsapi.org/v2/top-headlines');
-    url.searchParams.set('country', 'de');
-    url.searchParams.set('category', category);
-    url.searchParams.set('apiKey', process.env.NEWS_API_KEY);
-    const response = await fetch(url);
-    const data = await response.json();
-    return res.json((data.articles || []).map((article) => ({
-      title: article.title,
-      url: article.url,
-      source: article.source?.name,
-      category,
-      description: article.description,
-      imageUrl: article.urlToImage
-    })));
+    try {
+      const url = new URL('https://newsapi.org/v2/top-headlines');
+      url.searchParams.set('country', 'de');
+      url.searchParams.set('category', category);
+      url.searchParams.set('apiKey', process.env.NEWS_API_KEY);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('NewsAPI request failed');
+      const data = await response.json();
+      return res.json((data.articles || []).map((article) => ({
+        title: article.title,
+        url: article.url,
+        source: article.source?.name,
+        category,
+        description: article.description,
+        imageUrl: article.urlToImage
+      })));
+    } catch (error) {
+      console.error(error);
+    }
   }
-  res.json([]);
+  res.json(fallbackNews(category));
 });
 
 app.get('/api/weather', auth, async (_req, res) => {
   const lat = process.env.WEATHER_LAT || '48.3069';
   const lon = process.env.WEATHER_LON || '14.2858';
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto`;
-  const response = await fetch(url);
-  const data = await response.json();
-  res.json({ label: process.env.WEATHER_LABEL || 'Linz, Oberoesterreich', daily: data.daily });
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Weather request failed');
+    const data = await response.json();
+    if (!data.daily?.time?.length) throw new Error('Weather response missing daily data');
+    res.json({ label: process.env.WEATHER_LABEL || 'Linz, Oberoesterreich', daily: data.daily });
+  } catch (error) {
+    console.error(error);
+    res.json({ label: `${process.env.WEATHER_LABEL || 'Linz, Oberoesterreich'} (Fallback)`, daily: fallbackWeatherDaily() });
+  }
 });
 
 app.get('/api/traffic', auth, async (_req, res) => {
   if (!process.env.TRAFFIC_RSS_URL) {
-    return res.json([{ title: 'A1 Oberoesterreich', content: 'Keine TRAFFIC_RSS_URL konfiguriert. RSS-Link in backend/.env eintragen.' }]);
+    return res.json([
+      {
+        title: 'A1 Oberoesterreich',
+        link: 'https://www.asfinag.at/verkehr-sicherheit/',
+        content: 'Live-Verkehr ist noch nicht verbunden. Oeffne ASFINAG Verkehr oder setze TRAFFIC_RSS_URL in Render.'
+      }
+    ]);
   }
-  const feed = await rssParser.parseURL(process.env.TRAFFIC_RSS_URL);
-  const items = feed.items
-    .filter((item) => /A1|Oberoesterreich|Upper Austria|Linz|Wels|Enns/i.test(`${item.title} ${item.contentSnippet}`))
-    .slice(0, 8)
-    .map((item) => ({ title: item.title, link: item.link, content: item.contentSnippet }));
-  res.json(items);
+  try {
+    const feed = await rssParser.parseURL(process.env.TRAFFIC_RSS_URL);
+    const items = feed.items
+      .filter((item) => /A1|Oberoesterreich|Upper Austria|Linz|Wels|Enns/i.test(`${item.title} ${item.contentSnippet}`))
+      .slice(0, 8)
+      .map((item) => ({ title: item.title, link: item.link, content: item.contentSnippet }));
+    res.json(items.length ? items : [{ title: 'A1 Oberoesterreich', content: 'Aktuell keine passenden A1-Meldungen im Feed.' }]);
+  } catch (error) {
+    console.error(error);
+    res.json([{ title: 'A1 Oberoesterreich', content: 'Verkehrsfeed konnte gerade nicht geladen werden.' }]);
+  }
 });
 
 app.use(express.static(frontendDist));
