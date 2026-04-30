@@ -197,6 +197,30 @@ async function commonsImage(query) {
   return null;
 }
 
+async function travelImage(city, name, category) {
+  const lower = `${name} ${category || ''}`.toLowerCase();
+  const cityName = city.name;
+  const queries = [];
+  if (/barcelona/i.test(cityName) && /museum|stadtmuseum|histor/i.test(lower)) {
+    queries.push('Museu d Historia de Barcelona', 'Barcelona museum');
+  }
+  if (/museum|stadtmuseum|galerie|history|histor/i.test(lower)) {
+    queries.push(`${cityName} museum`, `${cityName} history museum`);
+  }
+  if (/strand|beach|playa|wasser|hafen|marina|promenade/i.test(lower)) {
+    queries.push(`${cityName} beach`, `${cityName} waterfront`, `${cityName} marina`);
+  }
+  if (/markt|market/i.test(lower)) queries.push(`${cityName} market`);
+  if (/aussicht|view|sunset|sonnenuntergang/i.test(lower)) queries.push(`${cityName} skyline`, `${cityName} panorama`);
+  queries.push(`${cityName} ${name}`, `${cityName} landmark`, `${cityName} old town`, cityName);
+
+  for (const query of [...new Set(queries)]) {
+    const image = await commonsImage(query);
+    if (image) return image;
+  }
+  return await wikiImage(cityName);
+}
+
 async function cityPlaces(city, tripType) {
   const geoUrl = new URL('https://de.wikipedia.org/w/api.php');
   geoUrl.searchParams.set('action', 'query');
@@ -211,7 +235,8 @@ async function cityPlaces(city, tripType) {
   const raw = data.query?.geosearch || [];
   const summaries = await Promise.all(raw.slice(0, 24).map(async (place) => {
     const summary = await wikiSummary(place.title);
-    const imageUrl = summary?.originalimage?.source || summary?.thumbnail?.source || await wikiImage(place.title) || await commonsImage(`${place.title} ${city.name}`);
+    const category = inferCategory(place.title, tripType);
+    const imageUrl = summary?.originalimage?.source || summary?.thumbnail?.source || await wikiImage(place.title) || await travelImage(city, place.title, category);
     return {
       name: place.title,
       coordinates: { lat: place.lat, lng: place.lon },
@@ -219,7 +244,7 @@ async function cityPlaces(city, tripType) {
       imageUrl: imageUrl || placeholderImage(place.title, city.name),
       sourceUrl: summary?.content_urls?.desktop?.page || `https://de.wikipedia.org/wiki/${encodeURIComponent(place.title)}`,
       rating: stableRating(place.title),
-      category: inferCategory(place.title, tripType)
+      category
     };
   }));
   return summaries.filter(Boolean);
@@ -230,7 +255,8 @@ async function fallbackPlaces(city, tripType) {
     ? ['Altstadt Spaziergang', 'Strandpromenade', 'Aussichtspunkt', 'Lokaler Markt', 'Sonnenuntergang am Wasser', 'Hafenviertel']
     : ['Historisches Zentrum', 'Stadtmuseum', 'Hauptplatz', 'Aussichtspunkt', 'Lokaler Markt', 'Kunstviertel', 'Parkanlage'];
   return Promise.all(names.map(async (name, index) => {
-    const imageUrl = await commonsImage(`${city.name} ${name}`);
+    const category = inferCategory(name, tripType);
+    const imageUrl = await travelImage(city, name, category);
     return {
       name,
       coordinates: { lat: city.lat + index * 0.006, lng: city.lng + index * 0.005 },
@@ -238,7 +264,7 @@ async function fallbackPlaces(city, tripType) {
       imageUrl: imageUrl || placeholderImage(name, city.name),
       sourceUrl: `https://de.wikipedia.org/w/index.php?search=${encodeURIComponent(`${city.name} ${name}`)}`,
       rating: stableRating(name),
-      category: inferCategory(name, tripType)
+      category
     };
   }));
 }
@@ -247,7 +273,7 @@ async function buildHotels(city, tripType) {
   const suffix = tripType === 'Strandurlaub' ? ['Beach', 'Marina', 'Seaside', 'Bay', 'Sunset'] : ['Central', 'Old Town', 'Museum', 'City', 'Boutique'];
   const hotels = await Promise.all(suffix.map(async (name, index) => {
     const hotelName = `${city.name} ${name} Hotel`;
-    const imageUrl = await commonsImage(`${city.name} hotel`);
+    const imageUrl = await commonsImage(`${city.name} hotel`) || await travelImage(city, 'Hotel', 'Hotel');
     return {
       name: hotelName,
       price: `${90 + index * 25}-${140 + index * 35} EUR/Nacht`,
