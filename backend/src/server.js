@@ -1,6 +1,9 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import fs from 'node:fs';
+import archiver from 'archiver';
+import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
@@ -18,6 +21,24 @@ const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+const uploadDir = process.env.UPLOAD_DIR || '/data/uploads';
+
+fs.mkdirSync(uploadDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '');
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Only images and PDFs are allowed'));
+  }
+});
 
 app.use(cors());
 app.use(express.json());
@@ -158,6 +179,13 @@ crudRoutes('gifts', 'giftIdea', (body) => ({
   notes: body.notes || null
 }));
 
+crudRoutes('shopping', 'shoppingItem', (body) => ({
+  name: body.name,
+  category: body.category || 'Allgemein',
+  quantity: body.quantity || null,
+  completed: Boolean(body.completed)
+}));
+
 crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   source: body.source || 'manual',
   externalId: body.externalId || null,
@@ -208,6 +236,64 @@ app.put('/api/trips/:id', auth, async (req, res) => {
 
 app.delete('/api/trips/:id', auth, async (req, res) => {
   await prisma.trip.delete({ where: { id: Number(req.params.id) } });
+  res.status(204).end();
+});
+
+app.get('/api/invoices', auth, async (_req, res) => {
+  const items = await prisma.invoice.findMany({ orderBy: [{ month: 'desc' }, { invoiceDate: 'desc' }, { id: 'desc' }] });
+  res.json(items);
+});
+
+app.post('/api/invoices', auth, upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Missing file' });
+  const invoiceDate = parseDate(req.body.invoiceDate) || new Date();
+  const month = invoiceDate.toISOString().slice(0, 7);
+  const item = await prisma.invoice.create({
+    data: {
+      merchant: req.body.merchant || 'Unbekannt',
+      category: req.body.category || null,
+      amount: req.body.amount === '' || req.body.amount == null ? null : Number(req.body.amount),
+      invoiceDate,
+      month,
+      notes: req.body.notes || null,
+      fileName: req.file.filename,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size
+    }
+  });
+  res.status(201).json(item);
+});
+
+app.get('/api/invoices/:id/download', auth, async (req, res) => {
+  const item = await prisma.invoice.findUnique({ where: { id: Number(req.params.id) } });
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  res.download(path.join(uploadDir, item.fileName), item.originalName);
+});
+
+app.get('/api/invoices/month/:month/download', auth, async (req, res) => {
+  const month = String(req.params.month || '');
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).json({ error: 'Invalid month' });
+  const items = await prisma.invoice.findMany({ where: { month }, orderBy: { invoiceDate: 'asc' } });
+  res.attachment(`rechnungen-${month}.zip`);
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.on('error', (error) => {
+    throw error;
+  });
+  archive.pipe(res);
+  for (const item of items) {
+    const safeMerchant = item.merchant.replace(/[^a-z0-9_-]+/gi, '_');
+    archive.file(path.join(uploadDir, item.fileName), { name: `${item.invoiceDate.toISOString().slice(0, 10)}-${safeMerchant}-${item.originalName}` });
+  }
+  archive.finalize();
+});
+
+app.delete('/api/invoices/:id', auth, async (req, res) => {
+  const item = await prisma.invoice.findUnique({ where: { id: Number(req.params.id) } });
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  await prisma.invoice.delete({ where: { id: item.id } });
+  const filePath = path.join(uploadDir, item.fileName);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   res.status(204).end();
 });
 

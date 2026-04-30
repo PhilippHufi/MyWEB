@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CheckSquare,
   CloudSun,
+  Download,
   Film,
   Gift,
   Home,
@@ -11,7 +12,9 @@ import {
   Newspaper,
   Plane,
   Plus,
+  ReceiptText,
   Search,
+  ShoppingCart,
   Sun,
   Trash2,
   Wallet
@@ -24,7 +27,9 @@ const API = import.meta.env.VITE_API_URL || '/api';
 const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'tasks', label: 'To-do', icon: CheckSquare },
+  { id: 'shopping', label: 'Shopping', icon: ShoppingCart },
   { id: 'gifts', label: 'Geschenke', icon: Gift },
+  { id: 'invoices', label: 'Rechnungen', icon: ReceiptText },
   { id: 'media', label: 'Filme & Musik', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
@@ -39,6 +44,41 @@ const defaults = {
   'news/bookmarks': [],
   trips: []
 };
+
+function fallbackWeather() {
+  const today = new Date();
+  return {
+    label: 'Linz, Oberoesterreich (Fallback)',
+    daily: {
+      time: Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() + index);
+        return date.toISOString().slice(0, 10);
+      }),
+      temperature_2m_min: [8, 9, 7, 10, 11, 9, 8],
+      temperature_2m_max: [17, 18, 16, 20, 21, 19, 17],
+      precipitation_probability_max: [20, 35, 45, 15, 10, 25, 30]
+    }
+  };
+}
+
+function fallbackNewsItems(category) {
+  const items = {
+    technology: [
+      ['Tagesschau Technik', 'https://www.tagesschau.de/wirtschaft/technologie/', 'Technik- und Digitalthemen oeffnen.'],
+      ['Heise News', 'https://www.heise.de/news/', 'IT, Software, Hardware und Netzpolitik.']
+    ],
+    business: [
+      ['Tagesschau Wirtschaft', 'https://www.tagesschau.de/wirtschaft/', 'Wirtschaftsnachrichten oeffnen.'],
+      ['Finanzen.net', 'https://www.finanzen.net/', 'Boerse, Wirtschaft und Finanznachrichten.']
+    ],
+    health: [
+      ['Tagesschau Gesundheit', 'https://www.tagesschau.de/thema/gesundheit/', 'Gesundheitsthemen oeffnen.'],
+      ['Robert Koch-Institut', 'https://www.rki.de/', 'Offizielle Gesundheitsinformationen.']
+    ]
+  };
+  return (items[category] || items.technology).map(([title, url, description]) => ({ title, url, description, source: 'Fallback', category }));
+}
 
 function getLocal(key) {
   return JSON.parse(localStorage.getItem(`pd:${key}`) || JSON.stringify(defaults[key] || []));
@@ -63,7 +103,7 @@ function useApi(token) {
       if (response.status === 204) return null;
       return response.json();
     }
-    return { request };
+    return { request, token };
   }, [token]);
 }
 
@@ -187,8 +227,8 @@ function Dashboard({ api }) {
 
   useEffect(() => {
     api.request('dashboard').then(setData).catch(() => {});
-    api.request('weather').then(setWeather).catch(() => {});
-    api.request('traffic').then(setTraffic).catch(() => {});
+    api.request('weather').then(setWeather).catch(() => setWeather(fallbackWeather()));
+    api.request('traffic').then(setTraffic).catch(() => setTraffic([{ title: 'A1 Oberoesterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsdaten gerade nicht erreichbar.' }]));
   }, []);
 
   return (
@@ -323,6 +363,146 @@ function Gifts({ api }) {
   );
 }
 
+function Shopping({ api }) {
+  const { items, add, update, remove } = useCollection(api, 'shopping');
+  const [form, setForm] = useState({ name: '', category: 'Lebensmittel', quantity: '' });
+  const grouped = items.reduce((acc, item) => {
+    acc[item.category] ||= [];
+    acc[item.category].push(item);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-4">
+      <Module title="Shoppingliste" onSubmit={() => add(form)}>
+        <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Artikel" />
+        <TextInput value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategorie" />
+        <TextInput value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="Menge" />
+      </Module>
+      <Card>
+        <div className="space-y-4">
+          {Object.entries(grouped).map(([category, products]) => (
+            <section key={category}>
+              <h3 className="mb-2 font-semibold">{category}</h3>
+              <div className="space-y-2">
+                {products.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+                    <label className="flex min-w-0 items-center gap-2">
+                      <input type="checkbox" checked={item.completed} onChange={(e) => update(item.id, { completed: e.target.checked })} />
+                      <span className={item.completed ? 'line-through text-zinc-500' : ''}>{item.name}{item.quantity ? ` - ${item.quantity}` : ''}</span>
+                    </label>
+                    <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!items.length && <p className="text-sm text-zinc-500">Noch keine Artikel.</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Invoices({ api }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
+  const [file, setFile] = useState(null);
+
+  async function load() {
+    setItems(await api.request('invoices'));
+  }
+
+  useEffect(() => {
+    load().catch(() => {});
+  }, []);
+
+  async function uploadInvoice(event) {
+    event.preventDefault();
+    if (!file) return;
+    const body = new FormData();
+    Object.entries(form).forEach(([key, value]) => body.append(key, value));
+    body.append('file', file);
+    const response = await fetch(`${API}/invoices`, {
+      method: 'POST',
+      headers: api.token ? { Authorization: `Bearer ${api.token}` } : {},
+      body
+    });
+    if (!response.ok) throw new Error(await response.text());
+    setFile(null);
+    setForm({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
+    await load();
+  }
+
+  async function downloadFile(path, name) {
+    const response = await fetch(`${API}/${path}`, { headers: api.token ? { Authorization: `Bearer ${api.token}` } : {} });
+    if (!response.ok) throw new Error(await response.text());
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function removeInvoice(item) {
+    if (!window.confirm(`Rechnung von ${item.merchant} wirklich loeschen?`)) return;
+    await api.request(`invoices/${item.id}`, { method: 'DELETE' });
+    await load();
+  }
+
+  const grouped = items.reduce((acc, item) => {
+    acc[item.month] ||= [];
+    acc[item.month].push(item);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <h2 className="mb-3 text-lg font-semibold">Rechnung speichern</h2>
+        <form onSubmit={uploadInvoice} className="grid gap-3 md:grid-cols-2">
+          <TextInput value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} placeholder="Geschaeft / Firma" />
+          <TextInput value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategorie" />
+          <TextInput value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} type="number" step="0.01" placeholder="Betrag" />
+          <TextInput value={form.invoiceDate} onChange={(e) => setForm({ ...form, invoiceDate: e.target.value })} type="date" />
+          <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notiz" />
+          <input className="input" type="file" accept="image/*,application/pdf" capture="environment" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <Button className="md:col-span-2" disabled={!file}><Plus className="h-4 w-4" />Speichern</Button>
+        </form>
+      </Card>
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([month, invoices]) => (
+          <Card key={month}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="font-semibold">{new Date(`${month}-01T00:00:00`).toLocaleDateString('de-AT', { month: 'long', year: 'numeric' })}</h3>
+              <Button type="button" onClick={() => downloadFile(`invoices/month/${month}/download`, `rechnungen-${month}.zip`)}><Download className="h-4 w-4" />Monat downloaden</Button>
+            </div>
+            <div className="space-y-2">
+              {invoices.map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-medium">{item.merchant}</div>
+                    <div className="text-zinc-500">
+                      {new Date(item.invoiceDate).toLocaleDateString('de-AT')}{item.amount != null ? ` - ${item.amount.toFixed(2)} EUR` : ''}{item.category ? ` - ${item.category}` : ''}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" className="icon-btn" onClick={() => downloadFile(`invoices/${item.id}/download`, item.originalName)} aria-label="Download"><Download className="h-4 w-4" /></button>
+                    <button type="button" className="icon-btn" onClick={() => removeInvoice(item)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+        {!items.length && <Card><p className="text-sm text-zinc-500">Noch keine Rechnungen gespeichert.</p></Card>}
+      </div>
+    </div>
+  );
+}
+
 function Media({ api }) {
   const favs = useCollection(api, 'media/favorites');
   const [query, setQuery] = useState('');
@@ -371,7 +551,7 @@ function News({ api }) {
   const bookmarks = useCollection(api, 'news/bookmarks');
   const [category, setCategory] = useState('technology');
   const [items, setItems] = useState([]);
-  useEffect(() => { api.request(`news?category=${category}`).then(setItems).catch(() => setItems([])); }, [category]);
+  useEffect(() => { api.request(`news?category=${category}`).then(setItems).catch(() => setItems(fallbackNewsItems(category))); }, [category]);
   return (
     <div className="space-y-4">
       <Select value={category} onChange={(e) => setCategory(e.target.value)} className="max-w-xs"><option value="technology">Tech</option><option value="business">Business</option><option value="health">Gesundheit</option></Select>
@@ -453,12 +633,14 @@ function App() {
 
   const pages = {
     dashboard: <Dashboard api={api} />,
-    finance: <Finance api={api} />,
     tasks: <Tasks api={api} />,
+    shopping: <Shopping api={api} />,
     gifts: <Gifts api={api} />,
+    invoices: <Invoices api={api} />,
     media: <Media api={api} />,
     news: <News api={api} />,
-    travel: <Travel api={api} />
+    travel: <Travel api={api} />,
+    finance: <Finance api={api} />
   };
 
   return (

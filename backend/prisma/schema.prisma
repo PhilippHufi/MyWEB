@@ -97,3 +97,27 @@ model TripAttraction {
   tripId  Int
   trip    Trip    @relation(fields: [tripId], references: [id], onDelete: Cascade)
 }
+
+model ShoppingItem {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  quantity  String?
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Invoice {
+  id           Int      @id @default(autoincrement())
+  merchant     String
+  category     String?
+  amount       Float?
+  invoiceDate  DateTime
+  month        String
+  notes        String?
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+}
