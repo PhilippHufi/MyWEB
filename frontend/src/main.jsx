@@ -15,6 +15,7 @@ import {
   Play,
   ReceiptText,
   Search,
+  Settings,
   ShoppingCart,
   Sun,
   Trash2,
@@ -34,7 +35,8 @@ const nav = [
   { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
-  { id: 'finance', label: 'Finanzen', icon: Wallet }
+  { id: 'finance', label: 'Finanzen', icon: Wallet },
+  { id: 'settings', label: 'Einstellungen', icon: Settings }
 ];
 
 const defaults = {
@@ -76,7 +78,12 @@ function fallbackNewsItems(scope = 'at', type = 'articles') {
     us: [['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.']],
     world: [['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.']]
   };
-  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description, imageUrl]) => ({ title, url, description, imageUrl, source: 'Fallback', category: scope, type }));
+  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description, imageUrl]) => ({ title, url, description, imageUrl, source: 'Fallback', category: scope, type, publishedAt: new Date().toISOString() }));
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Datum offen';
+  return new Date(value).toLocaleString('de-AT', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function getLocal(key) {
@@ -222,6 +229,7 @@ function useCollection(api, name) {
 function Dashboard({ api }) {
   const [weather, setWeather] = useState(null);
   const [traffic, setTraffic] = useState([]);
+  const [latestNews, setLatestNews] = useState([]);
   const today = new Date();
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
@@ -232,6 +240,7 @@ function Dashboard({ api }) {
   useEffect(() => {
     api.request('weather').then(setWeather).catch(() => setWeather(fallbackWeather()));
     api.request('traffic').then(setTraffic).catch(() => setTraffic([{ title: 'A1 Oberoesterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsdaten gerade nicht erreichbar.' }]));
+    api.request('news?scope=at&type=articles&category=all&period=week').then((data) => setLatestNews(data.slice(0, 3))).catch(() => setLatestNews(fallbackNewsItems('at').slice(0, 3)));
   }, []);
 
   return (
@@ -268,6 +277,19 @@ function Dashboard({ api }) {
           </div>
         </Card>
       </div>
+      <Card>
+        <h2 className="font-semibold">Neueste News</h2>
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          {latestNews.map((item) => (
+            <button key={item.url} type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} className="rounded-md bg-zinc-100 p-3 text-left text-sm hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">
+              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {formatDateTime(item.publishedAt)}</p>
+              <p className="mt-1 font-medium">{item.title}</p>
+              <p className="mt-1 line-clamp-2 text-zinc-500">{item.description || 'Keine Zusammenfassung vorhanden.'}</p>
+            </button>
+          ))}
+          {!latestNews.length && <p className="text-sm text-zinc-500">Keine aktuellen News geladen.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -836,17 +858,37 @@ function News({ api }) {
   const bookmarks = useCollection(api, 'news/bookmarks');
   const [scope, setScope] = useState('at');
   const [type, setType] = useState('articles');
+  const [category, setCategory] = useState('all');
+  const [period, setPeriod] = useState('today');
   const [items, setItems] = useState([]);
   const [openSaved, setOpenSaved] = useState(null);
+  const categories = [
+    ['all', 'Alle'],
+    ['inland', 'Inland'],
+    ['ausland', 'Ausland'],
+    ['sport', 'Sport'],
+    ['aktien', 'Aktien'],
+    ['wirtschaft', 'Wirtschaft'],
+    ['politik', 'Politik'],
+    ['kultur', 'Kultur'],
+    ['technik', 'Technik']
+  ];
+  const periods = [
+    ['today', 'Heute'],
+    ['yesterday', 'Gestern'],
+    ['week', 'Letzte Woche'],
+    ['month', 'Letzter Monat']
+  ];
 
   useEffect(() => {
-    api.request(`news?scope=${scope}&type=${type}`).then(setItems).catch(() => setItems(fallbackNewsItems(scope, type)));
-  }, [scope, type]);
+    api.request(`news?scope=${scope}&type=${type}&category=${category}&period=${period}`).then(setItems).catch(() => setItems(fallbackNewsItems(scope, type)));
+  }, [scope, type, category, period]);
 
   return (
     <div className="space-y-4">
       <Card>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-[1fr_auto]">
+          <div className="grid gap-3 md:grid-cols-3">
           <Select value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="at">Österreich</option>
             <option value="de">Deutschland</option>
@@ -857,6 +899,15 @@ function News({ api }) {
             <option value="articles">Leseartikel</option>
             <option value="audio">Audio</option>
           </Select>
+          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Select>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4 xl:w-[520px]">
+            {periods.map(([value, label]) => (
+              <Button key={value} type="button" className={period === value ? '' : 'bg-zinc-600'} onClick={() => setPeriod(value)}>{label}</Button>
+            ))}
+          </div>
         </div>
       </Card>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -864,7 +915,8 @@ function News({ api }) {
           <Card key={item.url} className="overflow-hidden p-0">
             {item.imageUrl && <img src={item.imageUrl} alt="" className="aspect-video w-full object-cover" />}
             <div className="p-4">
-              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
+              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.category || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
+              <p className="mt-1 text-xs text-zinc-500">{formatDateTime(item.publishedAt)}</p>
               <h3 className="mt-1 text-lg font-semibold leading-snug">{item.title}</h3>
               <p className="mt-2 line-clamp-4 text-sm text-zinc-600 dark:text-zinc-300">{item.description || 'Keine Zusammenfassung vorhanden.'}</p>
               <div className="mt-4 flex gap-2">
@@ -886,6 +938,7 @@ function News({ api }) {
               </div>
               {openSaved === item.id && (
                 <div className="mt-3 space-y-2 text-zinc-600 dark:text-zinc-300">
+                  <p className="text-xs uppercase text-zinc-500">{item.category || 'News'} - {formatDateTime(item.publishedAt)}</p>
                   <p>{item.description || 'Keine Beschreibung gespeichert.'}</p>
                   <a href={item.url} target="_blank" rel="noreferrer" className="underline">{item.type === 'audio' ? 'Audio öffnen' : 'Artikel öffnen'}</a>
                 </div>
@@ -1076,6 +1129,7 @@ function Travel({ api }) {
                         </div>
                         <p className="mt-1 line-clamp-3 text-zinc-600 dark:text-zinc-300">{activity.description}</p>
                         <p className="mt-2 text-xs text-zinc-500">{activity.category} - {activity.coordinates.lat.toFixed(4)}, {activity.coordinates.lng.toFixed(4)}</p>
+                        {activity.sourceUrl && <Button type="button" className="mt-3 h-9 bg-zinc-700" onClick={() => window.open(activity.sourceUrl, '_blank', 'noopener,noreferrer')}>Mehr erfahren</Button>}
                       </div>
                     </article>
                   ))}
@@ -1094,6 +1148,7 @@ function Travel({ api }) {
                     <h3 className="font-semibold">{hotel.name}</h3>
                     <p className="mt-1 text-zinc-500">{hotel.price} - {hotel.rating}/5</p>
                     <p className="mt-2 text-zinc-600 dark:text-zinc-300">{hotel.description}</p>
+                    {hotel.sourceUrl && <Button type="button" className="mt-3 h-9 bg-zinc-700" onClick={() => window.open(hotel.sourceUrl, '_blank', 'noopener,noreferrer')}>Mehr erfahren</Button>}
                   </div>
                 </article>
               ))}
@@ -1135,6 +1190,70 @@ function List({ items, remove, render }) {
   );
 }
 
+function SettingsPage({ api }) {
+  const [users, setUsers] = useState([]);
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [editing, setEditing] = useState(null);
+
+  async function loadUsers() {
+    setUsers(await api.request('users'));
+  }
+
+  useEffect(() => {
+    loadUsers().catch(() => setUsers([]));
+  }, []);
+
+  async function saveUser(event) {
+    event.preventDefault();
+    if (editing) {
+      await api.request(`users/${editing.id}`, { method: 'PUT', body: JSON.stringify(form) });
+    } else {
+      await api.request('users', { method: 'POST', body: JSON.stringify(form) });
+    }
+    setForm({ username: '', password: '' });
+    setEditing(null);
+    await loadUsers();
+  }
+
+  async function removeUser(user) {
+    if (!window.confirm(`${user.email} wirklich löschen?`)) return;
+    await api.request(`users/${user.id}`, { method: 'DELETE' });
+    await loadUsers();
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <h2 className="mb-3 font-semibold">{editing ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
+        <form onSubmit={saveUser} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <TextInput value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Benutzername" />
+          <TextInput value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} type="password" placeholder={editing ? 'Neues Passwort optional' : 'Passwort'} />
+          <Button>{editing ? 'Speichern' : 'Anlegen'}</Button>
+        </form>
+        {editing && <Button type="button" className="mt-3 bg-zinc-600" onClick={() => { setEditing(null); setForm({ username: '', password: '' }); }}>Abbrechen</Button>}
+      </Card>
+      <Card>
+        <h2 className="mb-3 font-semibold">Benutzer verwalten</h2>
+        <div className="space-y-2">
+          {users.map((user) => (
+            <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <div>
+                <p className="font-medium">{user.email}</p>
+                <p className="text-xs text-zinc-500">Angelegt: {formatDateTime(user.createdAt)}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" className="bg-zinc-700" onClick={() => { setEditing(user); setForm({ username: user.email, password: '' }); }}>Bearbeiten</Button>
+                <Button type="button" onClick={() => removeUser(user)}><Trash2 className="h-4 w-4" />Löschen</Button>
+              </div>
+            </div>
+          ))}
+          {!users.length && <p className="text-sm text-zinc-500">Keine Benutzer geladen.</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('pd:token'));
   const [page, setPage] = useState('dashboard');
@@ -1157,17 +1276,21 @@ function App() {
     media: <Media api={api} />,
     news: <News api={api} />,
     travel: <Travel api={api} />,
-    finance: <Finance api={api} />
+    finance: <Finance api={api} />,
+    settings: <SettingsPage api={api} />
   };
+  const mainNav = nav.filter((item) => item.id !== 'settings');
+  const settingsNav = nav.find((item) => item.id === 'settings');
 
   return (
     <div className="min-h-screen bg-zinc-100 text-ink dark:bg-zinc-950 dark:text-zinc-100">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 md:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 md:flex">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="font-semibold">Mein Dashboard</h1>
           <button className="icon-btn" onClick={() => setDark(!dark)}>{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
         </div>
-        <nav className="space-y-1">{nav.map((item) => <NavButton key={item.id} item={item} active={page === item.id} onClick={() => setPage(item.id)} />)}</nav>
+        <nav className="flex-1 space-y-1">{mainNav.map((item) => <NavButton key={item.id} item={item} active={page === item.id} onClick={() => setPage(item.id)} />)}</nav>
+        {settingsNav && <nav className="border-t border-zinc-200 pt-3 dark:border-zinc-800"><NavButton item={settingsNav} active={page === settingsNav.id} onClick={() => setPage(settingsNav.id)} /></nav>}
       </aside>
       <main className="md:pl-64">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 p-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">

@@ -150,6 +150,25 @@ async function wikiSummary(title) {
   return response.json();
 }
 
+async function commonsImage(query) {
+  const url = new URL('https://commons.wikimedia.org/w/api.php');
+  url.searchParams.set('action', 'query');
+  url.searchParams.set('generator', 'search');
+  url.searchParams.set('gsrsearch', query);
+  url.searchParams.set('gsrnamespace', '6');
+  url.searchParams.set('gsrlimit', '1');
+  url.searchParams.set('prop', 'imageinfo');
+  url.searchParams.set('iiprop', 'url');
+  url.searchParams.set('iiurlwidth', '900');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('origin', '*');
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const data = await response.json();
+  const page = Object.values(data.query?.pages || {})[0];
+  return page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url || null;
+}
+
 async function cityPlaces(city, tripType) {
   const geoUrl = new URL('https://de.wikipedia.org/w/api.php');
   geoUrl.searchParams.set('action', 'query');
@@ -164,11 +183,13 @@ async function cityPlaces(city, tripType) {
   const raw = data.query?.geosearch || [];
   const summaries = await Promise.all(raw.slice(0, 24).map(async (place) => {
     const summary = await wikiSummary(place.title);
+    const imageUrl = summary?.originalimage?.source || summary?.thumbnail?.source || await commonsImage(`${place.title} ${city.name}`);
     return {
       name: place.title,
       coordinates: { lat: place.lat, lng: place.lon },
       description: summary?.extract || 'Interessanter Ort in der Stadt.',
-      imageUrl: summary?.thumbnail?.source || placeholderImage(place.title, city.name),
+      imageUrl: imageUrl || placeholderImage(place.title, city.name),
+      sourceUrl: summary?.content_urls?.desktop?.page || `https://de.wikipedia.org/wiki/${encodeURIComponent(place.title)}`,
       rating: stableRating(place.title),
       category: inferCategory(place.title, tripType)
     };
@@ -176,29 +197,39 @@ async function cityPlaces(city, tripType) {
   return summaries.filter(Boolean);
 }
 
-function fallbackPlaces(city, tripType) {
+async function fallbackPlaces(city, tripType) {
   const names = tripType === 'Strandurlaub'
     ? ['Altstadt Spaziergang', 'Strandpromenade', 'Aussichtspunkt', 'Lokaler Markt', 'Sonnenuntergang am Wasser', 'Hafenviertel']
     : ['Historisches Zentrum', 'Stadtmuseum', 'Hauptplatz', 'Aussichtspunkt', 'Lokaler Markt', 'Kunstviertel', 'Parkanlage'];
-  return names.map((name, index) => ({
-    name,
-    coordinates: { lat: city.lat + index * 0.006, lng: city.lng + index * 0.005 },
-    description: `${name} in ${city.name}: passend fuer einen ${tripType}.`,
-    imageUrl: placeholderImage(name, city.name),
-    rating: stableRating(name),
-    category: inferCategory(name, tripType)
+  return Promise.all(names.map(async (name, index) => {
+    const imageUrl = await commonsImage(`${city.name} ${name}`);
+    return {
+      name,
+      coordinates: { lat: city.lat + index * 0.006, lng: city.lng + index * 0.005 },
+      description: `${name} in ${city.name}: passend fuer einen ${tripType}.`,
+      imageUrl: imageUrl || placeholderImage(name, city.name),
+      sourceUrl: `https://de.wikipedia.org/w/index.php?search=${encodeURIComponent(`${city.name} ${name}`)}`,
+      rating: stableRating(name),
+      category: inferCategory(name, tripType)
+    };
   }));
 }
 
-function buildHotels(city, tripType) {
+async function buildHotels(city, tripType) {
   const suffix = tripType === 'Strandurlaub' ? ['Beach', 'Marina', 'Seaside', 'Bay', 'Sunset'] : ['Central', 'Old Town', 'Museum', 'City', 'Boutique'];
-  return suffix.map((name, index) => ({
-    name: `${city.name} ${name} Hotel`,
-    price: `${90 + index * 25}-${140 + index * 35} EUR/Nacht`,
-    rating: Number((4.2 + index * 0.12).toFixed(1)),
-    imageUrl: placeholderImage(`${name} Hotel`, city.name),
-    description: tripType === 'Strandurlaub' ? 'Strandnah oder gut ans Wasser angebunden.' : 'Zentral gelegen fuer kurze Wege zu Kultur und Altstadt.'
-  })).slice(0, 5);
+  const hotels = await Promise.all(suffix.map(async (name, index) => {
+    const hotelName = `${city.name} ${name} Hotel`;
+    const imageUrl = await commonsImage(`${city.name} hotel`);
+    return {
+      name: hotelName,
+      price: `${90 + index * 25}-${140 + index * 35} EUR/Nacht`,
+      rating: Number((4.2 + index * 0.12).toFixed(1)),
+      imageUrl: imageUrl || placeholderImage(`${name} Hotel`, city.name),
+      sourceUrl: `https://www.google.com/maps/search/${encodeURIComponent(hotelName)}`,
+      description: tripType === 'Strandurlaub' ? 'Strandnah oder gut ans Wasser angebunden.' : 'Zentral gelegen fuer kurze Wege zu Kultur und Altstadt.'
+    };
+  }));
+  return hotels.slice(0, 5);
 }
 
 async function generateCityInfo(city, tripType, durationDays) {
@@ -230,7 +261,7 @@ async function generateCityInfo(city, tripType, durationDays) {
 async function buildTripPlan({ city, durationDays, tripType }) {
   const place = await geocodeCity(city);
   const fetched = await cityPlaces(place, tripType).catch(() => []);
-  const places = fetched.length >= 6 ? fetched : fallbackPlaces(place, tripType);
+  const places = fetched.length >= 6 ? fetched : await fallbackPlaces(place, tripType);
   const ordered = orderedByDistance({ lat: place.lat, lng: place.lng }, places);
   const days = Array.from({ length: durationDays }, (_, index) => ({
     day: index + 1,
@@ -253,12 +284,26 @@ async function buildTripPlan({ city, durationDays, tripType }) {
     tripType,
     coordinates: { lat: place.lat, lng: place.lng },
     days,
-    hotels: buildHotels(place, tripType),
+    hotels: await buildHotels(place, tripType),
     ...info
   };
 }
 
-function fallbackNews(scope = 'at', type = 'articles') {
+function newsCategoryLabel(category = 'all') {
+  return {
+    all: 'Alle',
+    inland: 'Inland',
+    ausland: 'Ausland',
+    sport: 'Sport',
+    aktien: 'Aktien',
+    wirtschaft: 'Wirtschaft',
+    politik: 'Politik',
+    kultur: 'Kultur',
+    technik: 'Technik'
+  }[category] || 'Alle';
+}
+
+function fallbackNews(scope = 'at', type = 'articles', category = 'all') {
   const audio = {
     at: [
       ['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Österreich.', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80'],
@@ -300,10 +345,11 @@ function fallbackNews(scope = 'at', type = 'articles') {
     title,
     url,
     source: 'Fallback',
-    category: scope,
+    category: newsCategoryLabel(category),
     type,
     description,
-    imageUrl
+    imageUrl,
+    publishedAt: new Date().toISOString()
   }));
 }
 
@@ -326,7 +372,48 @@ function imageFromFeedItem(item, scope) {
     || newsImage(scope, item.title);
 }
 
-async function rssNews(scope) {
+function newsSearchQuery(scope, category) {
+  const places = { at: 'Österreich', de: 'Deutschland', us: 'USA', world: 'Welt' };
+  const place = places[scope] || 'Österreich';
+  const queries = {
+    inland: `${place} Inland aktuelle Nachrichten`,
+    ausland: `${place} Ausland internationale Nachrichten`,
+    sport: `${place} Sport Nachrichten`,
+    aktien: `${place} Aktien Börse Finanzen`,
+    wirtschaft: `${place} Wirtschaft Nachrichten`,
+    politik: `${place} Politik Nachrichten`,
+    kultur: `${place} Kultur Nachrichten`,
+    technik: `${place} Technik Nachrichten`
+  };
+  return queries[category] || `${place} Nachrichten`;
+}
+
+function periodStart(period) {
+  const now = new Date();
+  const start = new Date(now);
+  if (period === 'yesterday') {
+    start.setDate(now.getDate() - 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+    return { start, end };
+  }
+  start.setHours(0, 0, 0, 0);
+  if (period === 'week') start.setDate(now.getDate() - 7);
+  if (period === 'month') start.setMonth(now.getMonth() - 1);
+  return { start, end: now };
+}
+
+function filterNewsPeriod(items, period) {
+  const { start, end } = periodStart(period);
+  return items.filter((item) => {
+    if (!item.publishedAt) return period !== 'today' && period !== 'yesterday';
+    const published = new Date(item.publishedAt);
+    return published >= start && published <= end;
+  });
+}
+
+async function rssNews(scope, category = 'all', period = 'today') {
   const sources = {
     at: [
       { source: 'ORF', url: 'https://rss.orf.at/news.xml' },
@@ -343,6 +430,11 @@ async function rssNews(scope) {
       { source: 'Google News Welt', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=de&gl=DE&ceid=DE:de' }
     ]
   };
+  if (category !== 'all') {
+    sources[scope] = [
+      { source: 'Google News', url: `https://news.google.com/rss/search?q=${encodeURIComponent(newsSearchQuery(scope, category))}&hl=de&gl=DE&ceid=DE:de` }
+    ];
+  }
 
   const feeds = await Promise.allSettled((sources[scope] || sources.de).map(async (source) => {
     const feed = await rssParser.parseURL(source.url);
@@ -350,7 +442,7 @@ async function rssNews(scope) {
       title: item.title || 'Nachricht',
       url: item.link,
       source: source.source,
-      category: scope,
+      category: newsCategoryLabel(category),
       type: 'articles',
       description: stripHtml(item.contentSnippet || item.summary || item.content || item.contentEncoded || 'Keine Kurzbeschreibung vorhanden.'),
       imageUrl: imageFromFeedItem(item, scope),
@@ -361,7 +453,9 @@ async function rssNews(scope) {
   return feeds
     .flatMap((result) => result.status === 'fulfilled' ? result.value : [])
     .filter((item, index, all) => item.url && all.findIndex((other) => other.url === item.url) === index)
+    .filter((item) => category === 'all' || item.title || item.description)
     .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
+    .filter((item) => filterNewsPeriod([item], period).length)
     .slice(0, 20);
 }
 
@@ -527,6 +621,51 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token: signUser(user), user: { id: user.id, username: user.email } });
 });
 
+app.get('/api/users', auth, async (_req, res) => {
+  const users = await prisma.user.findMany({
+    orderBy: { id: 'asc' },
+    select: { id: true, email: true, createdAt: true }
+  });
+  res.json(users);
+});
+
+app.post('/api/users', auth, async (req, res) => {
+  const username = String(req.body.username || req.body.email || '').trim();
+  const password = String(req.body.password || '');
+  if (!username || password.length < 4) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  const user = await prisma.user.create({
+    data: {
+      email: username,
+      passwordHash: await bcrypt.hash(password, 10)
+    },
+    select: { id: true, email: true, createdAt: true }
+  });
+  res.status(201).json(user);
+});
+
+app.put('/api/users/:id', auth, async (req, res) => {
+  const data = {};
+  const username = String(req.body.username || req.body.email || '').trim();
+  const password = String(req.body.password || '');
+  if (username) data.email = username;
+  if (password) data.passwordHash = await bcrypt.hash(password, 10);
+  const user = await prisma.user.update({
+    where: { id: Number(req.params.id) },
+    data,
+    select: { id: true, email: true, createdAt: true }
+  });
+  res.json(user);
+});
+
+app.delete('/api/users/:id', auth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === Number(req.user.sub)) return res.status(400).json({ error: 'Cannot delete current user' });
+  await prisma.user.delete({ where: { id } });
+  res.status(204).end();
+});
+
 app.get('/api/dashboard', auth, async (_req, res) => {
   const [tasks, finance, trips, gifts, favorites] = await Promise.all([
     prisma.task.findMany({ where: { completed: false }, orderBy: { dueDate: 'asc' }, take: 5 }),
@@ -602,8 +741,10 @@ crudRoutes('news/bookmarks', 'newsBookmark', (body) => ({
   url: body.url,
   source: body.source || null,
   category: body.category || null,
+  type: body.type || 'articles',
   description: body.description || null,
-  imageUrl: body.imageUrl || null
+  imageUrl: body.imageUrl || null,
+  publishedAt: parseDate(body.publishedAt)
 }));
 
 function mapTrip(body, replaceNested = false) {
@@ -887,13 +1028,15 @@ app.get('/api/media/discover', auth, async (req, res) => {
 app.get('/api/news', auth, async (req, res) => {
   const scope = String(req.query.scope || 'at');
   const type = String(req.query.type || 'articles');
+  const category = String(req.query.category || 'all');
+  const period = String(req.query.period || 'today');
   const countries = { at: 'at', de: 'de', us: 'us' };
   if (type === 'audio') {
-    return res.json(fallbackNews(scope, type));
+    return res.json(fallbackNews(scope, type, category));
   }
 
   try {
-    const rssItems = await rssNews(scope);
+    const rssItems = await rssNews(scope, category, period);
     if (rssItems.length) return res.json(rssItems);
   } catch (error) {
     console.error(error);
@@ -907,6 +1050,8 @@ app.get('/api/news', auth, async (req, res) => {
       } else {
         url.searchParams.set('country', countries[scope] || 'at');
       }
+      if (category === 'sport') url.searchParams.set('category', 'sports');
+      if (category === 'wirtschaft' || category === 'aktien') url.searchParams.set('category', 'business');
       url.searchParams.set('apiKey', process.env.NEWS_API_KEY);
       const response = await fetch(url);
       if (!response.ok) throw new Error('NewsAPI request failed');
@@ -915,17 +1060,19 @@ app.get('/api/news', auth, async (req, res) => {
         title: article.title,
         url: article.url,
         source: article.source?.name,
-        category: scope,
+        category: newsCategoryLabel(category),
         type: 'articles',
         description: article.description,
-        imageUrl: article.urlToImage
+        imageUrl: article.urlToImage,
+        publishedAt: article.publishedAt || null
       }));
-      if (articles.length) return res.json(articles);
+      const filtered = filterNewsPeriod(articles, period);
+      if (filtered.length) return res.json(filtered);
     } catch (error) {
       console.error(error);
     }
   }
-  res.json(fallbackNews(scope, type));
+  res.json(fallbackNews(scope, type, category));
 });
 
 app.get('/api/weather', auth, async (_req, res) => {
