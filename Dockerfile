@@ -23,6 +23,7 @@ FROM node:24-slim AS production
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
+ENV DATABASE_URL=file:/data/prod.db
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
