@@ -64,18 +64,18 @@ function fallbackWeather() {
 
 function fallbackNewsItems(scope = 'at', type = 'articles') {
   const audio = {
-    at: [['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Oesterreich.']],
+    at: [['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Österreich.', 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=900&q=80']],
     de: [['Deutschlandfunk Nachrichten', 'https://www.deutschlandfunk.de/nachrichten-100.html', 'Nachrichten aus Deutschland als Audio.']],
     us: [['NPR News Now', 'https://www.npr.org/podcasts/500005/npr-news-now', 'US-Nachrichten als Audio.']],
     world: [['BBC Global News Podcast', 'https://www.bbc.co.uk/programmes/p02nq0gn/episodes/downloads', 'Weltweite Nachrichten als Audio.']]
   };
   const items = {
-    at: [['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Oesterreich.']],
+    at: [['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Österreich.', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80']],
     de: [['Tagesschau', 'https://www.tagesschau.de/', 'Aktuelle Nachrichten aus Deutschland.']],
     us: [['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.']],
     world: [['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.']]
   };
-  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description]) => ({ title, url, description, source: 'Fallback', category: scope, type }));
+  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description, imageUrl]) => ({ title, url, description, imageUrl, source: 'Fallback', category: scope, type }));
 }
 
 function getLocal(key) {
@@ -665,15 +665,18 @@ function News({ api }) {
           </Select>
         </div>
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
-          <Card key={item.url}>
-            <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
-            <h3 className="mt-1 font-semibold">{item.title}</h3>
-            <p className="mt-2 text-sm text-zinc-500">{item.description}</p>
-            <div className="mt-4 flex gap-2">
-              <Button type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>{item.type === 'audio' ? 'Anhoeren' : 'Lesen'}</Button>
-              <Button type="button" onClick={() => bookmarks.add(item)}><Plus className="h-4 w-4" />Merken</Button>
+          <Card key={item.url} className="overflow-hidden p-0">
+            {item.imageUrl && <img src={item.imageUrl} alt="" className="aspect-video w-full object-cover" />}
+            <div className="p-4">
+              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
+              <h3 className="mt-1 text-lg font-semibold leading-snug">{item.title}</h3>
+              <p className="mt-2 line-clamp-4 text-sm text-zinc-600 dark:text-zinc-300">{item.description || 'Keine Zusammenfassung vorhanden.'}</p>
+              <div className="mt-4 flex gap-2">
+                <Button type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>{item.type === 'audio' ? 'Anhören' : 'Weiterlesen'}</Button>
+                <Button type="button" onClick={() => bookmarks.add(item)}><Plus className="h-4 w-4" />Merken</Button>
+              </div>
             </div>
           </Card>
         ))}

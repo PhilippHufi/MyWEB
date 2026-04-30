@@ -66,49 +66,49 @@ function parseDate(value) {
 function fallbackNews(scope = 'at', type = 'articles') {
   const audio = {
     at: [
-      ['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Oesterreich.'],
-      ['ORF Sound', 'https://sound.orf.at/', 'Nachrichten, Podcasts und Sendungen zum Anhoeren.']
+      ['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Österreich.', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80'],
+      ['ORF Sound', 'https://sound.orf.at/', 'Nachrichten, Podcasts und Sendungen zum Anhören.', 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=900&q=80']
     ],
     de: [
-      ['Deutschlandfunk Nachrichten', 'https://www.deutschlandfunk.de/nachrichten-100.html', 'Aktuelle Nachrichten aus Deutschland als Audio und Text.'],
-      ['Tagesschau in 100 Sekunden', 'https://www.tagesschau.de/multimedia/sendung/tagesschau_in_100_sekunden/', 'Kurzer Nachrichtenueberblick zum Ansehen und Anhoeren.']
+      ['Deutschlandfunk Nachrichten', 'https://www.deutschlandfunk.de/nachrichten-100.html', 'Aktuelle Nachrichten aus Deutschland als Audio und Text.', 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=80'],
+      ['Tagesschau in 100 Sekunden', 'https://www.tagesschau.de/multimedia/sendung/tagesschau_in_100_sekunden/', 'Kurzer Nachrichtenüberblick zum Ansehen und Anhören.', 'https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=900&q=80']
     ],
     us: [
-      ['NPR News Now', 'https://www.npr.org/podcasts/500005/npr-news-now', 'Aktuelle US-Nachrichten als Audio.'],
-      ['PBS NewsHour', 'https://www.pbs.org/newshour/podcasts', 'US- und Weltpolitik als Podcast.']
+      ['NPR News Now', 'https://www.npr.org/podcasts/500005/npr-news-now', 'Aktuelle US-Nachrichten als Audio.', 'https://images.unsplash.com/photo-1501466044931-62695aada8e9?auto=format&fit=crop&w=900&q=80'],
+      ['PBS NewsHour', 'https://www.pbs.org/newshour/podcasts', 'US- und Weltpolitik als Podcast.', 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=900&q=80']
     ],
     world: [
-      ['BBC Global News Podcast', 'https://www.bbc.co.uk/programmes/p02nq0gn/episodes/downloads', 'Weltweite Nachrichten als Audio.'],
-      ['DW News', 'https://www.dw.com/de/media-center/s-100824', 'Internationale Nachrichten der Deutschen Welle.']
+      ['BBC Global News Podcast', 'https://www.bbc.co.uk/programmes/p02nq0gn/episodes/downloads', 'Weltweite Nachrichten als Audio.', 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=80'],
+      ['DW News', 'https://www.dw.com/de/media-center/s-100824', 'Internationale Nachrichten der Deutschen Welle.', 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80']
     ]
   };
 
   const items = {
     at: [
-      ['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Oesterreich.'],
-      ['Der Standard', 'https://www.derstandard.at/', 'Nachrichten und Hintergruende aus Oesterreich.']
+      ['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Österreich.', 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80'],
+      ['Der Standard', 'https://www.derstandard.at/', 'Nachrichten und Hintergründe aus Österreich.', 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=80']
     ],
     de: [
-      ['Tagesschau', 'https://www.tagesschau.de/', 'Aktuelle Nachrichten aus Deutschland.'],
-      ['ZDFheute', 'https://www.zdf.de/nachrichten', 'Nachrichten und Videos aus Deutschland.']
+      ['Tagesschau', 'https://www.tagesschau.de/', 'Aktuelle Nachrichten aus Deutschland.', 'https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=900&q=80'],
+      ['ZDFheute', 'https://www.zdf.de/nachrichten', 'Nachrichten und Videos aus Deutschland.', 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=900&q=80']
     ],
     us: [
-      ['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.'],
-      ['PBS NewsHour', 'https://www.pbs.org/newshour/', 'US-Nachrichten und Hintergruende.']
+      ['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.', 'https://images.unsplash.com/photo-1501466044931-62695aada8e9?auto=format&fit=crop&w=900&q=80'],
+      ['PBS NewsHour', 'https://www.pbs.org/newshour/', 'US-Nachrichten und Hintergründe.', 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=900&q=80']
     ],
     world: [
-      ['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.'],
-      ['Deutsche Welle', 'https://www.dw.com/de/themen/s-9077', 'Internationale Nachrichten auf Deutsch.']
+      ['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.', 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=80'],
+      ['Deutsche Welle', 'https://www.dw.com/de/themen/s-9077', 'Internationale Nachrichten auf Deutsch.', 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80']
     ]
   };
-  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description]) => ({
+  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description, imageUrl]) => ({
     title,
     url,
     source: 'Fallback',
     category: scope,
     type,
     description,
-    imageUrl: null
+    imageUrl
   }));
 }
 
