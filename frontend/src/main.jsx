@@ -12,6 +12,7 @@ import {
   Newspaper,
   Plane,
   Plus,
+  Play,
   ReceiptText,
   Search,
   ShoppingCart,
@@ -514,6 +515,23 @@ function Media({ api }) {
   const [viewMode, setViewMode] = useState('top');
   const [topMovies, setTopMovies] = useState([]);
   const [results, setResults] = useState([]);
+  const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:media-trash') || '[]'));
+
+  function setTrashItems(next) {
+    setTrash(next);
+    localStorage.setItem('pd:media-trash', JSON.stringify(next));
+  }
+
+  async function removeFavorite(item) {
+    setTrashItems([{ ...item, deletedAt: new Date().toISOString() }, ...trash.filter((entry) => entry.id !== item.id)]);
+    await favs.remove(item.id);
+  }
+
+  async function restoreFavorite(item) {
+    const { id, createdAt, deletedAt, ...restored } = item;
+    await favs.add(restored);
+    setTrashItems(trash.filter((entry) => entry.id !== item.id));
+  }
 
   async function search(event) {
     event.preventDefault();
@@ -580,8 +598,20 @@ function Media({ api }) {
         <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audiences.map((name) => <option key={name}>{name}</option>)}</Select>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredFavorites.map((item) => <MediaCard key={item.id} item={item} onDelete={() => favs.remove(item.id)} onUpdate={(patch) => favs.update(item.id, patch)} />)}
+        {filteredFavorites.map((item) => <MediaCard key={item.id} item={item} onDelete={() => removeFavorite(item)} onUpdate={(patch) => favs.update(item.id, patch)} />)}
       </div>
+      <Card>
+        <h2 className="mb-3 font-semibold">Papierkorb</h2>
+        <div className="space-y-2">
+          {trash.map((item) => (
+            <div key={`${item.id}-${item.deletedAt}`} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <span>{item.title}</span>
+              <Button type="button" onClick={() => restoreFavorite(item)}>Wieder hinzufügen</Button>
+            </div>
+          ))}
+          {!trash.length && <p className="text-sm text-zinc-500">Keine entfernten Filme.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -631,7 +661,7 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
         </div>
       )}
       <div className="flex gap-2 px-3 pb-3">
-        {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700">Trailer öffnen</Button>}
+        {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700" title="Trailer auf YouTube öffnen"><Play className="h-4 w-4 fill-white" />YouTube</Button>}
         <Button onClick={onSave || onDelete}>{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
       </div>
     </Card>
