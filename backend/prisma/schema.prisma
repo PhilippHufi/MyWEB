@@ -62,6 +62,7 @@ model FavoriteMedia {
   releaseDate   String?
   watched       Boolean  @default(false)
   audience      String   @default("Für mich")
+  personalRating String?
   createdAt     DateTime @default(now())
 }
 

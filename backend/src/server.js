@@ -552,7 +552,8 @@ crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   popularity: body.popularity === '' || body.popularity == null ? null : Number(body.popularity),
   releaseDate: body.releaseDate || null,
   watched: Boolean(body.watched),
-  audience: body.audience || 'Für mich'
+  audience: body.audience || 'Für mich',
+  personalRating: body.personalRating || null
 }));
 
 crudRoutes('news/bookmarks', 'newsBookmark', (body) => ({

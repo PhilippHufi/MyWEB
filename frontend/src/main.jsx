@@ -537,6 +537,11 @@ function Media({ api }) {
     { label: 'Thriller', genreId: '53', keyword: '' }
   ];
 
+  async function saveFavorite(item) {
+    await favs.add({ ...item, audience: item.audience || 'Für mich' });
+    setTab('favorites');
+  }
+
   function setTrashItems(next) {
     setTrash(next);
     localStorage.setItem('pd:media-trash', JSON.stringify(next));
@@ -564,13 +569,20 @@ function Media({ api }) {
   }
 
   const genres = ['Alle', ...Array.from(new Set(favs.items.flatMap((item) => (item.genres || '').split(',').map((name) => name.trim()).filter(Boolean))))];
-  const audiences = ['Alle', 'Für mich', 'Für Freundin', 'Für Familie', 'Für Brüder', 'Für Kinder'];
+  const people = ['Für mich', 'Freundin', 'Familie', 'Brüder', 'Kinder'];
+  const audienceFilter = ['Alle', ...people];
   const filteredFavorites = favs.items.filter((item) => {
     const genreMatch = genre === 'Alle' || (item.genres || '').split(',').map((name) => name.trim()).includes(genre);
     const actorMatch = !actor.trim() || (item.actors || '').toLowerCase().includes(actor.trim().toLowerCase());
     const audienceMatch = audience === 'Alle' || item.audience === audience;
     return genreMatch && actorMatch && audienceMatch;
   });
+  const favoritesByPerson = people.reduce((acc, person) => {
+    acc[person] = filteredFavorites
+      .filter((item) => (item.audience || 'Für mich') === person)
+      .sort((a, b) => Number(Boolean(a.watched)) - Number(Boolean(b.watched)));
+    return acc;
+  }, {});
 
   useEffect(() => {
     const selected = tmdbGenres.find((entry) => entry.label === discoverGenre) || tmdbGenres[0];
@@ -643,7 +655,7 @@ function Media({ api }) {
       )}
       {(tab === 'search' || tab === 'top' || tab === 'future') && (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => <MediaCard key={`${tab}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
+        {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => <MediaCard key={`${tab}-${item.externalId}`} item={item} onSave={() => saveFavorite(item)} />)}
       </div>
       )}
       {tab === 'favorites' && (
@@ -652,10 +664,18 @@ function Media({ api }) {
         <h2 className="font-semibold">Meine Favoriten</h2>
         <Select value={genre} onChange={(e) => setGenre(e.target.value)}>{genres.map((name) => <option key={name}>{name}</option>)}</Select>
         <TextInput value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Nach Schauspieler filtern" />
-        <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audiences.map((name) => <option key={name}>{name}</option>)}</Select>
+        <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audienceFilter.map((name) => <option key={name}>{name}</option>)}</Select>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredFavorites.map((item) => <MediaCard key={item.id} item={item} onDelete={() => removeFavorite(item)} onUpdate={(patch) => favs.update(item.id, patch)} />)}
+      <div className="grid gap-4 xl:grid-cols-5">
+        {people.map((person) => (
+          <Card key={person} className="p-3">
+            <h3 className="mb-3 font-semibold">{person}</h3>
+            <div className="space-y-3">
+              {favoritesByPerson[person].map((item) => <MediaCard key={item.id} item={item} onDelete={() => removeFavorite(item)} onUpdate={(patch) => favs.update(item.id, patch)} compact />)}
+              {!favoritesByPerson[person].length && <p className="text-sm text-zinc-500">Keine Filme.</p>}
+            </div>
+          </Card>
+        ))}
       </div>
       <Card>
         <h2 className="mb-3 font-semibold">Papierkorb</h2>
@@ -675,13 +695,14 @@ function Media({ api }) {
   );
 }
 
-function MediaCard({ item, onSave, onDelete, onUpdate }) {
+function MediaCard({ item, onSave, onDelete, onUpdate, compact = false }) {
   const [open, setOpen] = useState(false);
   const rating = item.rating == null ? null : Math.round(Number(item.rating) / 2);
+  const personalRatings = ['Weltklasse', 'Gut', 'Mittel', 'Schlecht', 'Katastrophe'];
   return (
-    <Card className="overflow-hidden border-zinc-300 p-0">
+    <Card className={`overflow-hidden border-zinc-300 p-0 ${item.watched ? 'opacity-55 grayscale' : ''}`}>
       <div className="flex gap-3 p-3">
-        {item.imageUrl && <img src={item.imageUrl} alt="" className="h-36 w-24 shrink-0 rounded-md object-cover" />}
+        {item.imageUrl && <img src={item.imageUrl} alt="" className={`${compact ? 'h-28 w-20' : 'h-36 w-24'} shrink-0 rounded-md object-cover`} />}
         <button type="button" onClick={() => setOpen(!open)} className="min-w-0 flex-1 text-left">
           <h3 className="font-semibold leading-tight">{item.title}</h3>
           <p className="mt-1 text-sm text-zinc-500">
@@ -689,7 +710,7 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
           </p>
           <div className="mt-2 text-sm">
             <span className="text-zinc-500">Bewertung: </span>
-            <span className="text-amber-500">{rating == null ? 'offen' : '★★★★★'.split('').map((star, index) => <span key={index} className={index < rating ? '' : 'text-zinc-300'}>{star}</span>)}</span>
+            <span className="text-amber-500">{item.personalRating || (rating == null ? 'offen' : '★★★★★'.split('').map((star, index) => <span key={index} className={index < rating ? '' : 'text-zinc-300'}>{star}</span>))}</span>
           </div>
           {item.popularity != null && <p className="mt-1 text-sm text-zinc-500">Popularität: {Math.round(Number(item.popularity))}</p>}
         </button>
@@ -706,12 +727,18 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
           {onUpdate && (
             <div className="space-y-2 pt-2">
               <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(item.watched)} onChange={(e) => onUpdate({ watched: e.target.checked })} /> Bereits gesehen</label>
+              <label className="block text-xs font-medium text-zinc-500">Für:</label>
               <Select value={item.audience || 'Für mich'} onChange={(e) => onUpdate({ audience: e.target.value })}>
                 <option>Für mich</option>
-                <option>Für Freundin</option>
-                <option>Für Familie</option>
-                <option>Für Brüder</option>
-                <option>Für Kinder</option>
+                <option>Freundin</option>
+                <option>Familie</option>
+                <option>Brüder</option>
+                <option>Kinder</option>
+              </Select>
+              <label className="block text-xs font-medium text-zinc-500">Eigene Bewertung:</label>
+              <Select value={item.personalRating || ''} onChange={(e) => onUpdate({ personalRating: e.target.value })}>
+                <option value="">Keine</option>
+                {personalRatings.map((value) => <option key={value}>{value}</option>)}
               </Select>
             </div>
           )}
