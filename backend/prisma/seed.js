@@ -17,6 +17,14 @@ async function main() {
     create: { email, passwordHash }
   });
 
+  if (process.env.DEFAULT_USERNAME && process.env.DEFAULT_USER_EMAIL && process.env.DEFAULT_USERNAME !== process.env.DEFAULT_USER_EMAIL) {
+    await prisma.user.upsert({
+      where: { email: process.env.DEFAULT_USER_EMAIL },
+      update: { passwordHash },
+      create: { email: process.env.DEFAULT_USER_EMAIL, passwordHash }
+    });
+  }
+
   if ((await prisma.task.count()) === 0) {
     await prisma.task.createMany({
       data: [
