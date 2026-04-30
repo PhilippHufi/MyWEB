@@ -160,7 +160,7 @@ function mapMovie(movie, genres = new Map()) {
     rating: typeof movie.vote_average === 'number' ? movie.vote_average : null,
     popularity: typeof movie.popularity === 'number' ? movie.popularity : null,
     watched: false,
-    audience: 'Fuer mich'
+    audience: 'Für mich'
   };
 }
 
@@ -262,7 +262,7 @@ crudRoutes('media/favorites', 'favoriteMedia', (body) => ({
   popularity: body.popularity === '' || body.popularity == null ? null : Number(body.popularity),
   releaseDate: body.releaseDate || null,
   watched: Boolean(body.watched),
-  audience: body.audience || 'Fuer mich'
+  audience: body.audience || 'Für mich'
 }));
 
 crudRoutes('news/bookmarks', 'newsBookmark', (body) => ({
@@ -406,7 +406,7 @@ app.get('/api/media/search', auth, async (req, res) => {
             popularity: typeof details.popularity === 'number' ? details.popularity : null,
             releaseDate: details.release_date || movie.release_date || null,
             watched: false,
-            audience: 'Fuer mich'
+            audience: 'Für mich'
           };
         } catch (error) {
           console.error(error);
@@ -425,7 +425,7 @@ app.get('/api/media/search', auth, async (req, res) => {
             popularity: typeof movie.popularity === 'number' ? movie.popularity : null,
             releaseDate: movie.release_date || null,
             watched: false,
-            audience: 'Fuer mich'
+            audience: 'Für mich'
           };
         }
       }));
@@ -443,7 +443,7 @@ app.get('/api/media/search', auth, async (req, res) => {
       title: query,
       imageUrl: null,
       description: type === 'movie'
-        ? 'Film-Treffer manuell speichern. Fuer echte Filmsuche TMDB_API_KEY in Render setzen.'
+        ? 'Film-Treffer manuell speichern. Für echte Filmsuche TMDB_API_KEY in Render setzen.'
         : 'Musik-Treffer manuell speichern. Eine Musik-API ist noch nicht konfiguriert.'
     }
   ]);

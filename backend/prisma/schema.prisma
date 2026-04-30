@@ -61,7 +61,7 @@ model FavoriteMedia {
   popularity    Float?
   releaseDate   String?
   watched       Boolean  @default(false)
-  audience      String   @default("Fuer mich")
+  audience      String   @default("Für mich")
   createdAt     DateTime @default(now())
 }
 

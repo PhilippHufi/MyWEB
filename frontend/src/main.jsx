@@ -506,67 +506,80 @@ function Media({ api }) {
   const [query, setQuery] = useState('');
   const [type, setType] = useState('movie');
   const [genre, setGenre] = useState('Alle');
+  const [actor, setActor] = useState('');
+  const [audience, setAudience] = useState('Alle');
   const [listMode, setListMode] = useState('current');
   const [region, setRegion] = useState('AT');
   const [sort, setSort] = useState('popularity');
+  const [viewMode, setViewMode] = useState('top');
   const [topMovies, setTopMovies] = useState([]);
   const [results, setResults] = useState([]);
 
   async function search(event) {
     event.preventDefault();
     try {
+      setViewMode('search');
       setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=${type}`));
     } catch {
-      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Fuer mich' }]);
+      setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: type, title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Für mich' }]);
     }
   }
 
   const genres = ['Alle', ...Array.from(new Set(favs.items.flatMap((item) => (item.genres || '').split(',').map((name) => name.trim()).filter(Boolean))))];
-  const filteredFavorites = genre === 'Alle' ? favs.items : favs.items.filter((item) => (item.genres || '').split(',').map((name) => name.trim()).includes(genre));
+  const audiences = ['Alle', 'Für mich', 'Für Freundin', 'Für Familie', 'Für Brüder', 'Für Kinder'];
+  const filteredFavorites = favs.items.filter((item) => {
+    const genreMatch = genre === 'Alle' || (item.genres || '').split(',').map((name) => name.trim()).includes(genre);
+    const actorMatch = !actor.trim() || (item.actors || '').toLowerCase().includes(actor.trim().toLowerCase());
+    const audienceMatch = audience === 'Alle' || item.audience === audience;
+    return genreMatch && actorMatch && audienceMatch;
+  });
 
   useEffect(() => {
     api.request(`media/discover?mode=${listMode}&region=${region}&sort=${sort}`).then(setTopMovies).catch(() => setTopMovies([]));
   }, [listMode, region, sort]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_160px_auto]">
-          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Film oder Musik suchen" />
+    <div className="space-y-5">
+      <Card className="border-zinc-300">
+        <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_150px_auto]">
+          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Film oder Schauspieler suchen" />
           <Select value={type} onChange={(e) => setType(e.target.value)}><option value="movie">Film</option><option value="music">Musik</option></Select>
           <Button><Search className="h-4 w-4" />Suchen</Button>
         </form>
       </Card>
-      <Card>
+      <Card className="border-zinc-300">
+        <div className="mb-3 flex gap-2">
+          <Button type="button" className={viewMode === 'top' ? '' : 'bg-zinc-600'} onClick={() => setViewMode('top')}>Toplisten</Button>
+          <Button type="button" className={viewMode === 'search' ? '' : 'bg-zinc-600'} onClick={() => setViewMode('search')}>Suche</Button>
+        </div>
         <div className="grid gap-3 md:grid-cols-[1fr_160px_190px]">
           <Select value={listMode} onChange={(e) => setListMode(e.target.value)}>
             <option value="current">Top 30 aktuell</option>
             <option value="previous">Top 30 Vorjahr</option>
-            <option value="next_year">Filme naechstes Jahr</option>
+            <option value="next_year">Filme nächstes Jahr</option>
           </Select>
           <Select value={region} onChange={(e) => setRegion(e.target.value)} disabled={listMode === 'next_year'}>
-            <option value="AT">Oesterreich</option>
+            <option value="AT">Österreich</option>
             <option value="world">Weltweit</option>
             <option value="US">Amerika</option>
           </Select>
           <Select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="popularity">Views / Popularitaet</option>
+            <option value="popularity">Views / Popularität</option>
             <option value="release_date">Erscheinungsdatum</option>
             <option value="rating">Bewertung</option>
           </Select>
         </div>
       </Card>
-      <div className="grid gap-4 md:grid-cols-3">
-        {topMovies.map((item) => <MediaCard key={`${listMode}-${region}-${sort}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {(viewMode === 'top' ? topMovies : results).map((item) => <MediaCard key={`${viewMode}-${item.externalId}`} item={item} onSave={() => favs.add(item)} />)}
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {results.map((item) => <MediaCard key={item.externalId} item={item} onSave={() => favs.add(item)} />)}
-      </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="grid gap-3 border-t border-zinc-200 pt-4 md:grid-cols-[1fr_1fr_1fr] dark:border-zinc-800">
         <h2 className="font-semibold">Favoriten</h2>
-        <Select value={genre} onChange={(e) => setGenre(e.target.value)} className="sm:max-w-xs">{genres.map((name) => <option key={name}>{name}</option>)}</Select>
+        <Select value={genre} onChange={(e) => setGenre(e.target.value)}>{genres.map((name) => <option key={name}>{name}</option>)}</Select>
+        <TextInput value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Nach Schauspieler filtern" />
+        <Select value={audience} onChange={(e) => setAudience(e.target.value)}>{audiences.map((name) => <option key={name}>{name}</option>)}</Select>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredFavorites.map((item) => <MediaCard key={item.id} item={item} onDelete={() => favs.remove(item.id)} onUpdate={(patch) => favs.update(item.id, patch)} />)}
       </div>
     </div>
@@ -575,41 +588,52 @@ function Media({ api }) {
 
 function MediaCard({ item, onSave, onDelete, onUpdate }) {
   const [open, setOpen] = useState(false);
+  const rating = item.rating == null ? null : Math.round(Number(item.rating) / 2);
+  const popularity = Math.min(100, Math.round(Number(item.popularity || 0)));
   return (
-    <Card>
-      <button type="button" onClick={() => setOpen(!open)} className="block w-full text-left">
-        {item.imageUrl && <img src={item.imageUrl} alt="" className="mb-3 aspect-[2/3] w-full rounded-md object-cover" />}
-        <h3 className="font-semibold">{item.title}</h3>
-        <p className="mt-1 text-sm text-zinc-500">
+    <Card className="overflow-hidden border-zinc-300 p-0">
+      <div className="flex gap-3 p-3">
+        {item.imageUrl && <img src={item.imageUrl} alt="" className="h-36 w-24 shrink-0 rounded-md object-cover" />}
+        <button type="button" onClick={() => setOpen(!open)} className="min-w-0 flex-1 text-left">
+          <h3 className="font-semibold leading-tight">{item.title}</h3>
+          <p className="mt-1 text-sm text-zinc-500">
           {[item.releaseYear, item.audience, item.watched ? 'gesehen' : item.id ? 'nicht gesehen' : null].filter(Boolean).join(' - ')}
-        </p>
-        <p className="mt-1 text-sm text-zinc-500">
-          {item.rating != null ? `Bewertung ${Number(item.rating).toFixed(1)}/10` : 'Bewertung offen'}
-          {item.popularity != null ? ` - Popularitaet ${Math.round(Number(item.popularity))}` : ''}
-        </p>
-      </button>
-      <p className="mt-2 line-clamp-4 text-sm text-zinc-500">{item.description}</p>
+          </p>
+          <div className="mt-2 text-amber-500">{rating == null ? 'Bewertung offen' : '★★★★★'.split('').map((star, index) => <span key={index} className={index < rating ? '' : 'text-zinc-300'}>{star}</span>)}</div>
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span className="text-red-600">☹</span>
+            <div className="h-2 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-700"><div className="h-2 rounded-full bg-green-600" style={{ width: `${popularity}%` }} /></div>
+            <span className="text-green-600">☺</span>
+          </div>
+        </button>
+      </div>
+      <div className="px-3 pb-3">
+        <p className={`${open ? '' : 'line-clamp-3'} text-sm text-zinc-500`}>{item.description}</p>
+        <button type="button" onClick={() => setOpen(!open)} className="mt-1 text-sm font-medium text-sea">{open ? 'Vorschau schließen' : 'Vorschau aufklappen'}</button>
+      </div>
       {open && (
-        <div className="mt-3 space-y-2 text-sm">
+        <div className="space-y-2 px-3 pb-3 text-sm">
           {item.releaseDate && <p><span className="font-medium">Erscheinungsdatum:</span> {new Date(`${item.releaseDate}T00:00:00`).toLocaleDateString('de-AT')}</p>}
           {item.genres && <p><span className="font-medium">Genre:</span> {item.genres}</p>}
           {item.actors && <p><span className="font-medium">Schauspieler:</span> {item.actors}</p>}
-          {item.trailerUrl && <a href={item.trailerUrl} target="_blank" rel="noreferrer" className="inline-flex text-sea underline">Trailer oeffnen</a>}
           {onUpdate && (
             <div className="space-y-2 pt-2">
               <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(item.watched)} onChange={(e) => onUpdate({ watched: e.target.checked })} /> Bereits gesehen</label>
-              <Select value={item.audience || 'Fuer mich'} onChange={(e) => onUpdate({ audience: e.target.value })}>
-                <option>Fuer mich</option>
-                <option>Fuer Freundin</option>
-                <option>Fuer Familie</option>
-                <option>Fuer Brueder</option>
-                <option>Fuer Kinder</option>
+              <Select value={item.audience || 'Für mich'} onChange={(e) => onUpdate({ audience: e.target.value })}>
+                <option>Für mich</option>
+                <option>Für Freundin</option>
+                <option>Für Familie</option>
+                <option>Für Brüder</option>
+                <option>Für Kinder</option>
               </Select>
             </div>
           )}
         </div>
       )}
-      <Button onClick={onSave || onDelete} className="mt-4">{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
+      <div className="flex gap-2 px-3 pb-3">
+        {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700">Trailer öffnen</Button>}
+        <Button onClick={onSave || onDelete}>{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
+      </div>
     </Card>
   );
 }
