@@ -81,6 +81,7 @@ model NewsBookmark {
   type        String?
   description String?
   imageUrl     String?
+  audioUrl     String?
   publishedAt  DateTime?
   createdAt   DateTime @default(now())
 }

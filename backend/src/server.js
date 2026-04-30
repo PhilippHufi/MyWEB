@@ -49,7 +49,7 @@ const upload = multer({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '200mb' }));
 
 function signUser(user) {
   return jwt.sign({ sub: user.id, username: user.email }, jwtSecret, { expiresIn: '7d' });
@@ -69,6 +69,12 @@ function auth(req, res, next) {
 
 function parseDate(value) {
   return value ? new Date(value) : null;
+}
+
+function cleanRecord(item, omit = ['id', 'createdAt']) {
+  const copy = { ...item };
+  for (const key of omit) delete copy[key];
+  return copy;
 }
 
 function sqlitePath() {
@@ -490,9 +496,10 @@ function imageFromFeedItem(item, scope) {
     || newsImage(scope, item.title);
 }
 
-function newsSearchQuery(scope, category) {
+function newsSearchQuery(scope, category, query = '') {
   const places = { at: 'Österreich', de: 'Deutschland', us: 'USA', world: 'Welt' };
   const place = places[scope] || 'Österreich';
+  if (query.trim()) return `${query.trim()} ${place} Nachrichten`;
   const queries = {
     inland: `${place} Inland aktuelle Nachrichten`,
     ausland: `${place} Ausland internationale Nachrichten`,
@@ -531,7 +538,7 @@ function filterNewsPeriod(items, period) {
   });
 }
 
-async function rssNews(scope, category = 'all', period = 'today') {
+async function rssNews(scope, category = 'all', period = 'today', query = '') {
   const sources = {
     at: [
       { source: 'ORF', url: 'https://rss.orf.at/news.xml' },
@@ -548,9 +555,9 @@ async function rssNews(scope, category = 'all', period = 'today') {
       { source: 'Google News Welt', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=de&gl=DE&ceid=DE:de' }
     ]
   };
-  if (category !== 'all') {
+  if (category !== 'all' || query.trim()) {
     sources[scope] = [
-      { source: 'Google News', url: `https://news.google.com/rss/search?q=${encodeURIComponent(newsSearchQuery(scope, category))}&hl=de&gl=DE&ceid=DE:de` }
+      { source: 'Google News', url: `https://news.google.com/rss/search?q=${encodeURIComponent(newsSearchQuery(scope, category, query))}&hl=de&gl=DE&ceid=DE:de` }
     ];
   }
 
@@ -574,6 +581,44 @@ async function rssNews(scope, category = 'all', period = 'today') {
     .filter((item) => category === 'all' || item.title || item.description)
     .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
     .filter((item) => filterNewsPeriod([item], period).length)
+    .slice(0, 20);
+}
+
+async function audioNews(scope, category = 'all', period = 'today', query = '') {
+  const feeds = [
+    { source: 'tagesschau Audio', category: 'Alle', url: 'https://www.tagesschau.de/multimedia/sendung/tagesschau_20_uhr/podcast-ts2000-audio-100~podcast.xml' },
+    { source: 'Deutschlandfunk Nachrichten', category: 'Alle', url: 'https://www.deutschlandfunk.de/nachrichten-108.xml' },
+    { source: 'Deutschlandfunk Sport', category: 'Sport', url: 'https://www.deutschlandfunk.de/sport-aktuell-podcast-100.xml' },
+    { source: 'Deutschlandfunk Technik', category: 'Technik', url: 'https://www.deutschlandfunk.de/computer-und-kommunikation-102.xml' },
+    { source: 'Deutschlandfunk Kultur', category: 'Kultur', url: 'https://www.deutschlandfunk.de/kultur-heute-104.xml' },
+    { source: 'Deutschlandfunk Wirtschaft', category: 'Wirtschaft', url: 'https://www.deutschlandfunk.de/wirtschaft-und-gesellschaft-104.xml' }
+  ];
+  const selectedFeeds = feeds.filter((feed) => category === 'all' || feed.category === newsCategoryLabel(category) || feed.category === 'Alle');
+  const parsed = await Promise.allSettled(selectedFeeds.map(async (feedSource) => {
+    const feed = await rssParser.parseURL(feedSource.url);
+    return (feed.items || []).slice(0, 12).map((item) => {
+      const audioUrl = item.enclosure?.url || item.enclosure?.link || null;
+      return {
+        title: item.title || 'Audio-Nachricht',
+        url: audioUrl || item.link || feedSource.url,
+        audioUrl,
+        source: feedSource.source,
+        category: feedSource.category,
+        type: 'audio',
+        description: stripHtml(item.contentSnippet || item.summary || item.content || 'Keine Kurzbeschreibung vorhanden.'),
+        imageUrl: imageFromFeedItem(item, scope),
+        publishedAt: item.isoDate || item.pubDate || null
+      };
+    });
+  }));
+  const normalizedQuery = query.trim().toLowerCase();
+  return parsed
+    .flatMap((result) => result.status === 'fulfilled' ? result.value : [])
+    .filter((item) => item.audioUrl)
+    .filter((item) => !normalizedQuery || `${item.title} ${item.description}`.toLowerCase().includes(normalizedQuery))
+    .filter((item) => filterNewsPeriod([item], period).length)
+    .filter((item, index, all) => all.findIndex((other) => other.audioUrl === item.audioUrl) === index)
+    .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
     .slice(0, 20);
 }
 
@@ -784,6 +829,84 @@ app.delete('/api/users/:id', auth, async (req, res) => {
   res.status(204).end();
 });
 
+app.get('/api/export', auth, async (_req, res) => {
+  const [finance, tasks, gifts, shopping, mediaFavorites, newsBookmarks, trips, invoices] = await Promise.all([
+    prisma.financeEntry.findMany({ orderBy: { id: 'asc' } }),
+    prisma.task.findMany({ orderBy: { id: 'asc' } }),
+    prisma.giftIdea.findMany({ orderBy: { id: 'asc' } }),
+    prisma.shoppingItem.findMany({ orderBy: { id: 'asc' } }),
+    prisma.favoriteMedia.findMany({ orderBy: { id: 'asc' } }),
+    prisma.newsBookmark.findMany({ orderBy: { id: 'asc' } }),
+    prisma.trip.findMany({ orderBy: { id: 'asc' }, include: { hotels: true, attractions: true } }),
+    prisma.invoice.findMany({ orderBy: { id: 'asc' } })
+  ]);
+  const invoicesWithFiles = invoices.map((invoice) => {
+    const filePath = path.join(uploadDir, invoice.fileName);
+    return {
+      ...invoice,
+      fileData: fs.existsSync(filePath) ? fs.readFileSync(filePath).toString('base64') : null
+    };
+  });
+  res.json({
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: { finance, tasks, gifts, shopping, mediaFavorites, newsBookmarks, trips, invoices: invoicesWithFiles }
+  });
+});
+
+app.post('/api/import', auth, async (req, res) => {
+  const payload = req.body?.data || req.body;
+  if (!payload || typeof payload !== 'object') return res.status(400).json({ error: 'Invalid import file' });
+  const invoices = Array.isArray(payload.invoices) ? payload.invoices : [];
+
+  await prisma.$transaction(async (tx) => {
+    await tx.invoice.deleteMany();
+    await tx.tripAttraction.deleteMany();
+    await tx.tripHotel.deleteMany();
+    await tx.trip.deleteMany();
+    await tx.newsBookmark.deleteMany();
+    await tx.favoriteMedia.deleteMany();
+    await tx.shoppingItem.deleteMany();
+    await tx.giftIdea.deleteMany();
+    await tx.task.deleteMany();
+    await tx.financeEntry.deleteMany();
+
+    for (const item of payload.finance || []) await tx.financeEntry.create({ data: { ...cleanRecord(item), date: parseDate(item.date) || new Date() } });
+    for (const item of payload.tasks || []) await tx.task.create({ data: { ...cleanRecord(item), dueDate: parseDate(item.dueDate) } });
+    for (const item of payload.gifts || []) await tx.giftIdea.create({ data: cleanRecord(item) });
+    for (const item of payload.shopping || []) await tx.shoppingItem.create({ data: cleanRecord(item) });
+    for (const item of payload.mediaFavorites || []) await tx.favoriteMedia.create({ data: cleanRecord(item) });
+    for (const item of payload.newsBookmarks || []) await tx.newsBookmark.create({ data: { ...cleanRecord(item), publishedAt: parseDate(item.publishedAt) } });
+    for (const trip of payload.trips || []) {
+      await tx.trip.create({
+        data: {
+          ...cleanRecord(trip, ['id', 'createdAt', 'hotels', 'attractions', 'plan']),
+          startDate: parseDate(trip.startDate) || new Date(),
+          endDate: parseDate(trip.endDate) || new Date(),
+          hotels: { create: (trip.hotels || []).map((hotel) => cleanRecord(hotel, ['id', 'tripId'])) },
+          attractions: { create: (trip.attractions || []).map((attraction) => cleanRecord(attraction, ['id', 'tripId'])) }
+        }
+      });
+    }
+    for (const invoice of invoices) {
+      await tx.invoice.create({
+        data: {
+          ...cleanRecord(invoice, ['id', 'createdAt', 'fileData']),
+          invoiceDate: parseDate(invoice.invoiceDate) || new Date()
+        }
+      });
+    }
+  });
+
+  fs.mkdirSync(uploadDir, { recursive: true });
+  for (const invoice of invoices) {
+    if (!invoice.fileData || !invoice.fileName) continue;
+    fs.writeFileSync(path.join(uploadDir, invoice.fileName), Buffer.from(invoice.fileData, 'base64'));
+  }
+
+  res.json({ ok: true });
+});
+
 app.get('/api/dashboard', auth, async (_req, res) => {
   const [tasks, finance, trips, gifts, favorites] = await Promise.all([
     prisma.task.findMany({ where: { completed: false }, orderBy: { dueDate: 'asc' }, take: 5 }),
@@ -862,6 +985,7 @@ crudRoutes('news/bookmarks', 'newsBookmark', (body) => ({
   type: body.type || 'articles',
   description: body.description || null,
   imageUrl: body.imageUrl || null,
+  audioUrl: body.audioUrl || null,
   publishedAt: parseDate(body.publishedAt)
 }));
 
@@ -1148,13 +1272,20 @@ app.get('/api/news', auth, async (req, res) => {
   const type = String(req.query.type || 'articles');
   const category = String(req.query.category || 'all');
   const period = String(req.query.period || 'today');
+  const query = String(req.query.q || '').trim();
   const countries = { at: 'at', de: 'de', us: 'us' };
   if (type === 'audio') {
+    try {
+      const audioItems = await audioNews(scope, category, period, query);
+      if (audioItems.length) return res.json(audioItems);
+    } catch (error) {
+      console.error(error);
+    }
     return res.json(fallbackNews(scope, type, category));
   }
 
   try {
-    const rssItems = await rssNews(scope, category, period);
+    const rssItems = await rssNews(scope, category, period, query);
     if (rssItems.length) return res.json(rssItems);
   } catch (error) {
     console.error(error);
@@ -1170,6 +1301,7 @@ app.get('/api/news', auth, async (req, res) => {
       }
       if (category === 'sport') url.searchParams.set('category', 'sports');
       if (category === 'wirtschaft' || category === 'aktien') url.searchParams.set('category', 'business');
+      if (query) url.searchParams.set('q', query);
       url.searchParams.set('apiKey', process.env.NEWS_API_KEY);
       const response = await fetch(url);
       if (!response.ok) throw new Error('NewsAPI request failed');
@@ -1202,7 +1334,7 @@ app.get('/api/weather', auth, async (_req, res) => {
     if (!response.ok) throw new Error('Weather request failed');
     const data = await response.json();
     if (!data.daily?.time?.length) throw new Error('Weather response missing daily data');
-    res.json({ label: process.env.WEATHER_LABEL || 'Linz, Oberoesterreich', daily: data.daily });
+    res.json({ label: process.env.WEATHER_LABEL || 'Linz, Oberoesterreich', source: 'Open-Meteo', daily: data.daily });
   } catch (error) {
     console.error(error);
     res.json({ label: `${process.env.WEATHER_LABEL || 'Linz, Oberoesterreich'} (Fallback)`, daily: fallbackWeatherDaily() });

@@ -52,6 +52,7 @@ function fallbackWeather() {
   const today = new Date();
   return {
     label: 'Linz, Oberoesterreich (Fallback)',
+    source: 'Fallback',
     daily: {
       time: Array.from({ length: 7 }, (_, index) => {
         const date = new Date(today);
@@ -254,20 +255,33 @@ function Dashboard({ api }) {
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h2 className="font-semibold">Diese Woche{weather?.label ? ` - ${weather.label}` : ''}</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Diese Woche{weather?.label ? ` - ${weather.label}` : ''}</h2>
+              <p className="mt-1 text-xs text-zinc-500">Quelle: {weather?.source || 'Open-Meteo'}</p>
+            </div>
+            <CloudSun className="h-8 w-8 text-sea" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {(weather?.daily?.time || []).map((day, index) => (
               <div key={day} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
-                <CloudSun className="mb-2 h-5 w-5 text-sea" />
-                <div className="font-medium">{new Date(day).toLocaleDateString('de-AT', { weekday: 'short' })}</div>
-                <div>{Math.round(weather.daily.temperature_2m_min[index])} - {Math.round(weather.daily.temperature_2m_max[index])} C</div>
-                <div className="text-zinc-500">{weather.daily.precipitation_probability_max[index] || 0}% Regen</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">{new Date(day).toLocaleDateString('de-AT', { weekday: 'short' })}</div>
+                  <CloudSun className="h-4 w-4 text-sea" />
+                </div>
+                <div className="mt-2 text-lg font-semibold">{Math.round(weather.daily.temperature_2m_max[index])}°C</div>
+                <div className="text-xs text-zinc-500">Min {Math.round(weather.daily.temperature_2m_min[index])}°C</div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white dark:bg-zinc-900">
+                  <div className="h-full rounded-full bg-sea" style={{ width: `${Math.min(100, weather.daily.precipitation_probability_max[index] || 0)}%` }} />
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">{weather.daily.precipitation_probability_max[index] || 0}% Regen</div>
               </div>
             ))}
           </div>
         </Card>
         <Card>
           <h2 className="font-semibold">A1 Oberoesterreich</h2>
+          <p className="mt-1 text-xs text-zinc-500">Quelle: ASFINAG / Fallback</p>
           <div className="mt-3 space-y-2">
             {traffic.map((item, index) => (
               <p key={index} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
@@ -282,7 +296,7 @@ function Dashboard({ api }) {
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           {latestNews.map((item) => (
             <button key={item.url} type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')} className="rounded-md bg-zinc-100 p-3 text-left text-sm hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">
-              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {formatDateTime(item.publishedAt)}</p>
+              <p className="text-xs uppercase text-zinc-500">Quelle: {item.source || 'News'} - {formatDateTime(item.publishedAt)}</p>
               <p className="mt-1 font-medium">{item.title}</p>
               <p className="mt-1 line-clamp-2 text-zinc-500">{item.description || 'Keine Zusammenfassung vorhanden.'}</p>
             </button>
@@ -860,6 +874,7 @@ function News({ api }) {
   const [type, setType] = useState('articles');
   const [category, setCategory] = useState('all');
   const [period, setPeriod] = useState('today');
+  const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [openSaved, setOpenSaved] = useState(null);
   const categories = [
@@ -881,14 +896,15 @@ function News({ api }) {
   ];
 
   useEffect(() => {
-    api.request(`news?scope=${scope}&type=${type}&category=${category}&period=${period}`).then(setItems).catch(() => setItems(fallbackNewsItems(scope, type)));
-  }, [scope, type, category, period]);
+    api.request(`news?scope=${scope}&type=${type}&category=${category}&period=${period}&q=${encodeURIComponent(query)}`).then(setItems).catch(() => setItems(fallbackNewsItems(scope, type)));
+  }, [scope, type, category, period, query]);
 
   return (
     <div className="space-y-4">
       <Card>
         <div className="grid gap-3 xl:grid-cols-[1fr_auto]">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
+          <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="News suchen" />
           <Select value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="at">Österreich</option>
             <option value="de">Deutschland</option>
@@ -915,10 +931,11 @@ function News({ api }) {
           <Card key={item.url} className="overflow-hidden p-0">
             {item.imageUrl && <img src={item.imageUrl} alt="" className="aspect-video w-full object-cover" />}
             <div className="p-4">
-              <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.category || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
+              <p className="text-xs uppercase text-zinc-500">Quelle: {item.source || 'News'} - {item.category || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
               <p className="mt-1 text-xs text-zinc-500">{formatDateTime(item.publishedAt)}</p>
               <h3 className="mt-1 text-lg font-semibold leading-snug">{item.title}</h3>
               <p className="mt-2 line-clamp-4 text-sm text-zinc-600 dark:text-zinc-300">{item.description || 'Keine Zusammenfassung vorhanden.'}</p>
+              {item.audioUrl && <audio controls src={item.audioUrl} className="mt-3 w-full" />}
               <div className="mt-4 flex gap-2">
                 <Button type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>{item.type === 'audio' ? 'Anhören' : 'Weiterlesen'}</Button>
                 <Button type="button" onClick={() => bookmarks.add(item)}><Plus className="h-4 w-4" />Merken</Button>
@@ -940,6 +957,7 @@ function News({ api }) {
                 <div className="mt-3 space-y-2 text-zinc-600 dark:text-zinc-300">
                   <p className="text-xs uppercase text-zinc-500">{item.category || 'News'} - {formatDateTime(item.publishedAt)}</p>
                   <p>{item.description || 'Keine Beschreibung gespeichert.'}</p>
+                  {item.audioUrl && <audio controls src={item.audioUrl} className="w-full" />}
                   <a href={item.url} target="_blank" rel="noreferrer" className="underline">{item.type === 'audio' ? 'Audio öffnen' : 'Artikel öffnen'}</a>
                 </div>
               )}
@@ -1061,22 +1079,6 @@ function Travel({ api }) {
         </Card>
       )}
 
-      <Card>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-semibold">Reise-Papierkorb</h2>
-          <Button type="button" disabled={!tripTrash.length} onClick={() => window.confirm('Papierkorb wirklich komplett leeren?') && setTripTrashItems([])}>Papierkorb leeren</Button>
-        </div>
-        <div className="space-y-2">
-          {tripTrash.map((trip) => (
-            <div key={`${trip.id}-${trip.deletedAt}`} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
-              <span>{trip.destination}</span>
-              <Button type="button" onClick={() => restoreTrip(trip)}>Wiederherstellen</Button>
-            </div>
-          ))}
-          {!tripTrash.length && <p className="text-sm text-zinc-500">Keine gelöschten Reisen.</p>}
-        </div>
-      </Card>
-
       {plan && (
         <>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
@@ -1193,6 +1195,21 @@ function Travel({ api }) {
           </div>
         </>
       )}
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Reise-Papierkorb</h2>
+          <Button type="button" disabled={!tripTrash.length} onClick={() => window.confirm('Papierkorb wirklich komplett leeren?') && setTripTrashItems([])}>Papierkorb leeren</Button>
+        </div>
+        <div className="space-y-2">
+          {tripTrash.map((trip) => (
+            <div key={`${trip.id}-${trip.deletedAt}`} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <span>{trip.destination}</span>
+              <Button type="button" onClick={() => restoreTrip(trip)}>Wiederherstellen</Button>
+            </div>
+          ))}
+          {!tripTrash.length && <p className="text-sm text-zinc-500">Keine gelöschten Reisen.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -1231,6 +1248,7 @@ function SettingsPage({ api }) {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ username: '', password: '' });
   const [editing, setEditing] = useState(null);
+  const [backupStatus, setBackupStatus] = useState('');
 
   async function loadUsers() {
     setUsers(await api.request('users'));
@@ -1258,8 +1276,47 @@ function SettingsPage({ api }) {
     await loadUsers();
   }
 
+  async function exportData() {
+    setBackupStatus('Export wird erstellt...');
+    const backup = await api.request('export');
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `myweb-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupStatus('Export fertig.');
+  }
+
+  async function importData(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!window.confirm('Import ersetzt Filme, Rechnungen, Reisen, Geschenke, Shopping, Aufgaben, Finanzen und gespeicherte News. Fortfahren?')) {
+      event.target.value = '';
+      return;
+    }
+    setBackupStatus('Import läuft...');
+    const text = await file.text();
+    await api.request('import', { method: 'POST', body: text });
+    event.target.value = '';
+    setBackupStatus('Import fertig. Lade die Seite neu, falls du die Daten nicht sofort siehst.');
+  }
+
   return (
     <div className="space-y-4">
+      <Card>
+        <h2 className="mb-3 font-semibold">Daten sichern</h2>
+        <div className="grid gap-3 md:grid-cols-[auto_1fr]">
+          <Button type="button" onClick={exportData}><Download className="h-4 w-4" />Alles exportieren</Button>
+          <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md bg-zinc-700 px-3 text-sm font-medium text-white hover:bg-zinc-800">
+            Importieren
+            <input type="file" accept="application/json,.json" onChange={importData} className="hidden" />
+          </label>
+        </div>
+        <p className="mt-3 text-sm text-zinc-500">Export enthält Filme, Rechnungen inklusive Dateien, Reisen, Geschenke, Shopping, Aufgaben, Finanzen und gespeicherte News. Benutzer werden beim Import nicht ersetzt.</p>
+        {backupStatus && <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{backupStatus}</p>}
+      </Card>
       <Card>
         <h2 className="mb-3 font-semibold">{editing ? 'Benutzer bearbeiten' : 'Benutzer anlegen'}</h2>
         <form onSubmit={saveUser} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
