@@ -81,7 +81,10 @@ model Trip {
   destination String
   startDate   DateTime
   endDate     DateTime
+  durationDays Int?
+  tripType    String?
   notes       String?
+  planJson    String?
   createdAt   DateTime         @default(now())
   hotels      TripHotel[]
   attractions TripAttraction[]

@@ -1,0 +1,3 @@
+ALTER TABLE "Trip" ADD COLUMN "durationDays" INTEGER;
+ALTER TABLE "Trip" ADD COLUMN "tripType" TEXT;
+ALTER TABLE "Trip" ADD COLUMN "planJson" TEXT;

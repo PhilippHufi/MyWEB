@@ -63,6 +63,174 @@ function parseDate(value) {
   return value ? new Date(value) : null;
 }
 
+function distanceKm(a, b) {
+  const radius = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const value = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return radius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function orderedByDistance(start, places) {
+  const remaining = [...places];
+  const ordered = [];
+  let current = start;
+  while (remaining.length) {
+    remaining.sort((a, b) => distanceKm(current, a.coordinates) - distanceKm(current, b.coordinates));
+    const next = remaining.shift();
+    ordered.push(next);
+    current = next.coordinates;
+  }
+  return ordered;
+}
+
+function inferCategory(title, tripType) {
+  if (/beach|strand|playa|mare|marina|port|hafen|bad|see/i.test(title)) return 'Strand';
+  if (/museum|cathedral|kirche|castle|palace|galerie|theater|opera|monument|dom|basilica/i.test(title)) return 'Kultur';
+  if (tripType === 'Strandurlaub') return 'Strand';
+  if (tripType === 'Kultururlaub') return 'Kultur';
+  return 'Gemischt';
+}
+
+function stableRating(text, min = 4.1, max = 4.9) {
+  const sum = [...text].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return Number((min + (sum % 80) / 100 * ((max - min) / 0.8)).toFixed(1));
+}
+
+async function geocodeCity(city) {
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('limit', '1');
+  url.searchParams.set('q', city);
+  const response = await fetch(url, { headers: { 'User-Agent': 'MyWEB private trip planner' } });
+  const data = await response.json();
+  const first = data[0];
+  if (!first) throw new Error('City not found');
+  return {
+    name: first.display_name.split(',')[0],
+    lat: Number(first.lat),
+    lng: Number(first.lon),
+    displayName: first.display_name
+  };
+}
+
+async function wikiSummary(title) {
+  const url = `https://de.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  return response.json();
+}
+
+async function cityPlaces(city, tripType) {
+  const geoUrl = new URL('https://de.wikipedia.org/w/api.php');
+  geoUrl.searchParams.set('action', 'query');
+  geoUrl.searchParams.set('list', 'geosearch');
+  geoUrl.searchParams.set('gscoord', `${city.lat}|${city.lng}`);
+  geoUrl.searchParams.set('gsradius', '10000');
+  geoUrl.searchParams.set('gslimit', '40');
+  geoUrl.searchParams.set('format', 'json');
+  geoUrl.searchParams.set('origin', '*');
+  const response = await fetch(geoUrl);
+  const data = await response.json();
+  const raw = data.query?.geosearch || [];
+  const summaries = await Promise.all(raw.slice(0, 24).map(async (place) => {
+    const summary = await wikiSummary(place.title);
+    return {
+      name: place.title,
+      coordinates: { lat: place.lat, lng: place.lon },
+      description: summary?.extract || 'Interessanter Ort in der Stadt.',
+      imageUrl: summary?.thumbnail?.source || `https://source.unsplash.com/900x600/?${encodeURIComponent(place.title)}`,
+      rating: stableRating(place.title),
+      category: inferCategory(place.title, tripType)
+    };
+  }));
+  return summaries.filter(Boolean);
+}
+
+function fallbackPlaces(city, tripType) {
+  const names = tripType === 'Strandurlaub'
+    ? ['Altstadt Spaziergang', 'Strandpromenade', 'Aussichtspunkt', 'Lokaler Markt', 'Sonnenuntergang am Wasser', 'Hafenviertel']
+    : ['Historisches Zentrum', 'Stadtmuseum', 'Hauptplatz', 'Aussichtspunkt', 'Lokaler Markt', 'Kunstviertel', 'Parkanlage'];
+  return names.map((name, index) => ({
+    name,
+    coordinates: { lat: city.lat + index * 0.006, lng: city.lng + index * 0.005 },
+    description: `${name} in ${city.name}: passend fuer einen ${tripType}.`,
+    imageUrl: `https://source.unsplash.com/900x600/?${encodeURIComponent(`${city.name} ${name}`)}`,
+    rating: stableRating(name),
+    category: inferCategory(name, tripType)
+  }));
+}
+
+function buildHotels(city, tripType) {
+  const suffix = tripType === 'Strandurlaub' ? ['Beach', 'Marina', 'Seaside', 'Bay', 'Sunset'] : ['Central', 'Old Town', 'Museum', 'City', 'Boutique'];
+  return suffix.map((name, index) => ({
+    name: `${city.name} ${name} Hotel`,
+    price: `${90 + index * 25}-${140 + index * 35} EUR/Nacht`,
+    rating: Number((4.2 + index * 0.12).toFixed(1)),
+    imageUrl: `https://source.unsplash.com/900x600/?hotel,${encodeURIComponent(city.name)}`,
+    description: tripType === 'Strandurlaub' ? 'Strandnah oder gut ans Wasser angebunden.' : 'Zentral gelegen fuer kurze Wege zu Kultur und Altstadt.'
+  })).slice(0, 5);
+}
+
+async function generateCityInfo(city, tripType, durationDays) {
+  const fallback = {
+    cultureInfo: `${city.name} eignet sich fuer ${tripType}. Plane vormittags die wichtigsten Sehenswuerdigkeiten und nachmittags entspannte Viertel, Maerkte oder Aussichtspunkte.`,
+    behaviorTips: ['Wertsachen nah am Koerper tragen.', 'Tickets fuer beliebte Orte frueh buchen.', 'Oeffentliche Verkehrsmittel vorab pruefen.', 'In touristischen Bereichen auf Taschendiebe achten.'],
+    funFacts: [`${city.name} laesst sich gut in ${durationDays} Tagen erkunden.`, 'Lokale Maerkte sind oft die beste Quelle fuer Essen und Alltagskultur.', 'Fruehe Startzeiten vermeiden Warteschlangen.']
+  };
+  if (!process.env.OPENAI_API_KEY) return fallback;
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+        input: `Erstelle kurze Reise-Zusatzinfos fuer ${city.name}, ${durationDays} Tage, Typ ${tripType}. Antworte nur als JSON mit cultureInfo string, behaviorTips array, funFacts array.`
+      })
+    });
+    if (!response.ok) throw new Error('AI request failed');
+    const data = await response.json();
+    const text = data.output_text || data.output?.flatMap((item) => item.content || []).map((part) => part.text).join('\n');
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(error);
+    return fallback;
+  }
+}
+
+async function buildTripPlan({ city, durationDays, tripType }) {
+  const place = await geocodeCity(city);
+  const fetched = await cityPlaces(place, tripType).catch(() => []);
+  const places = fetched.length >= 6 ? fetched : fallbackPlaces(place, tripType);
+  const ordered = orderedByDistance({ lat: place.lat, lng: place.lng }, places);
+  const days = Array.from({ length: durationDays }, (_, index) => ({
+    day: index + 1,
+    title: `Tag ${index + 1}`,
+    activities: ordered.slice(index * 4, index * 4 + 4)
+  }));
+  for (let index = 0; index < days.length; index += 1) {
+    if (days[index].activities.length < 3) {
+      days[index].activities = ordered.slice(0, 4).map((activity, offset) => ({
+        ...activity,
+        name: offset === 0 ? `${activity.name} erneut vertiefen` : activity.name
+      })).slice(0, 3);
+    }
+  }
+  const info = await generateCityInfo(place, tripType, durationDays);
+  return {
+    city: place.name,
+    displayName: place.displayName,
+    durationDays,
+    tripType,
+    coordinates: { lat: place.lat, lng: place.lng },
+    days,
+    hotels: buildHotels(place, tripType),
+    ...info
+  };
+}
+
 function fallbackNews(scope = 'at', type = 'articles') {
   const audio = {
     at: [
@@ -279,7 +447,10 @@ function mapTrip(body, replaceNested = false) {
     destination: body.destination,
     startDate: parseDate(body.startDate) || new Date(),
     endDate: parseDate(body.endDate) || new Date(),
+    durationDays: body.durationDays == null ? null : Number(body.durationDays),
+    tripType: body.tripType || null,
     notes: body.notes || null,
+    planJson: body.planJson ? JSON.stringify(body.planJson) : undefined,
     hotels: body.hotels ? (replaceNested ? { deleteMany: {}, create: body.hotels } : { create: body.hotels }) : undefined,
     attractions: body.attractions ? (replaceNested ? { deleteMany: {}, create: body.attractions } : { create: body.attractions }) : undefined
   };
@@ -287,7 +458,7 @@ function mapTrip(body, replaceNested = false) {
 
 app.get('/api/trips', auth, async (_req, res) => {
   const items = await prisma.trip.findMany({ orderBy: { id: 'desc' }, include: { hotels: true, attractions: true } });
-  res.json(items);
+  res.json(items.map((item) => ({ ...item, plan: item.planJson ? JSON.parse(item.planJson) : null })));
 });
 
 app.post('/api/trips', auth, async (req, res) => {
@@ -308,6 +479,36 @@ app.delete('/api/trips/:id', auth, async (req, res) => {
   await prisma.trip.delete({ where: { id: Number(req.params.id) } });
   res.status(204).end();
 });
+
+async function handleGenerateTrip(req, res) {
+  const city = String(req.body.city || '').trim();
+  const durationDays = Math.max(1, Math.min(21, Number(req.body.durationDays || 7)));
+  const tripType = req.body.tripType || 'Gemischt';
+  if (!city) return res.status(400).json({ error: 'Missing city' });
+
+  const plan = await buildTripPlan({ city, durationDays, tripType });
+  if (req.body.save !== false) {
+    const startDate = parseDate(req.body.startDate) || new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + durationDays - 1);
+    const saved = await prisma.trip.create({
+      data: {
+        destination: plan.city,
+        startDate,
+        endDate,
+        durationDays,
+        tripType,
+        notes: plan.cultureInfo,
+        planJson: JSON.stringify(plan)
+      }
+    });
+    return res.status(201).json({ ...plan, savedTripId: saved.id });
+  }
+  res.json(plan);
+}
+
+app.post('/api/generate-trip', auth, handleGenerateTrip);
+app.post('/generate-trip', auth, handleGenerateTrip);
 
 app.get('/api/invoices', auth, async (_req, res) => {
   const items = await prisma.invoice.findMany({ orderBy: [{ month: 'desc' }, { invoiceDate: 'desc' }, { id: 'desc' }] });
@@ -545,25 +746,17 @@ app.get('/api/weather', auth, async (_req, res) => {
 });
 
 app.get('/api/traffic', auth, async (_req, res) => {
-  if (!process.env.TRAFFIC_RSS_URL) {
-    return res.json([
-      {
-        title: 'A1 Oberoesterreich',
-        link: 'https://www.asfinag.at/verkehr-sicherheit/',
-        content: 'Live-Verkehr ist noch nicht verbunden. Oeffne ASFINAG Verkehr oder setze TRAFFIC_RSS_URL in Render.'
-      }
-    ]);
-  }
+  const feedUrl = process.env.TRAFFIC_RSS_URL || 'https://www.oeamtc.at/feeds/verkehr/';
   try {
-    const feed = await rssParser.parseURL(process.env.TRAFFIC_RSS_URL);
+    const feed = await rssParser.parseURL(feedUrl);
     const items = feed.items
-      .filter((item) => /A1|Oberoesterreich|Upper Austria|Linz|Wels|Enns/i.test(`${item.title} ${item.contentSnippet}`))
+      .filter((item) => /A1|Oberoesterreich|Oberösterreich|Upper Austria|Linz|Wels|Enns|St\.? Florian|Sattledt/i.test(`${item.title} ${item.contentSnippet}`))
       .slice(0, 8)
       .map((item) => ({ title: item.title, link: item.link, content: item.contentSnippet }));
-    res.json(items.length ? items : [{ title: 'A1 Oberoesterreich', content: 'Aktuell keine passenden A1-Meldungen im Feed.' }]);
+    res.json(items.length ? items : [{ title: 'A1 Oberösterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Aktuell keine passenden A1-Meldungen im Feed.' }]);
   } catch (error) {
     console.error(error);
-    res.json([{ title: 'A1 Oberoesterreich', content: 'Verkehrsfeed konnte gerade nicht geladen werden.' }]);
+    res.json([{ title: 'A1 Oberösterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsfeed konnte gerade nicht geladen werden.' }]);
   }
 });
 

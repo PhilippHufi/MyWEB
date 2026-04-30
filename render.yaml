@@ -29,6 +29,10 @@ services:
         value: ""
       - key: TRAFFIC_RSS_URL
         value: ""
+      - key: OPENAI_API_KEY
+        value: ""
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
       - key: WEATHER_LAT
         value: 48.3069
       - key: WEATHER_LON

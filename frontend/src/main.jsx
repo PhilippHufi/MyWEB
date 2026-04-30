@@ -736,28 +736,154 @@ function News({ api }) {
 }
 
 function Travel({ api }) {
-  const { items, add, remove } = useCollection(api, 'trips');
-  const [form, setForm] = useState({ destination: '', startDate: '', endDate: '', notes: '', hotelsText: '', attractionsText: '' });
-  function submit() {
-    add({
-      destination: form.destination,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      notes: form.notes,
-      hotels: form.hotelsText.split('\n').filter(Boolean).map((name) => ({ name })),
-      attractions: form.attractionsText.split('\n').filter(Boolean).map((name) => ({ name }))
+  const [form, setForm] = useState({ city: 'Barcelona', durationDays: 7, tripType: 'Gemischt' });
+  const [plan, setPlan] = useState(null);
+  const [savedTrips, setSavedTrips] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [drag, setDrag] = useState(null);
+
+  async function loadTrips() {
+    const data = await api.request('trips');
+    setSavedTrips(data.filter((trip) => trip.plan));
+  }
+
+  useEffect(() => {
+    loadTrips().catch(() => {});
+  }, []);
+
+  async function submit(event) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      const generated = await api.request('generate-trip', {
+        method: 'POST',
+        body: JSON.stringify({
+          city: form.city,
+          durationDays: Number(form.durationDays),
+          tripType: form.tripType,
+          save: true
+        })
+      });
+      setPlan(generated);
+      await loadTrips();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function moveActivity(fromDay, fromIndex, toDay, toIndex = null) {
+    setPlan((current) => {
+      if (!current) return current;
+      const days = current.days.map((day) => ({ ...day, activities: [...day.activities] }));
+      const [activity] = days[fromDay].activities.splice(fromIndex, 1);
+      const insertAt = toIndex == null ? days[toDay].activities.length : toIndex;
+      days[toDay].activities.splice(insertAt, 0, activity);
+      return { ...current, days };
     });
   }
+
   return (
-    <Module title="Urlaubsplaner" onSubmit={submit} form={form} setForm={setForm}>
-      <TextInput value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Reiseziel" />
-      <TextInput value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} type="date" />
-      <TextInput value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} type="date" />
-      <textarea className="input md:col-span-2" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notizen" />
-      <textarea className="input" value={form.hotelsText} onChange={(e) => setForm({ ...form, hotelsText: e.target.value })} placeholder="Hotels, je Zeile eins" />
-      <textarea className="input" value={form.attractionsText} onChange={(e) => setForm({ ...form, attractionsText: e.target.value })} placeholder="Sehenswuerdigkeiten, je Zeile eine" />
-      <List items={items} remove={remove} render={(item) => `${item.destination} - ${new Date(item.startDate).toLocaleDateString('de-AT')} bis ${new Date(item.endDate).toLocaleDateString('de-AT')}`} />
-    </Module>
+    <div className="space-y-5">
+      <Card>
+        <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_120px_180px_auto]">
+          <TextInput value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Stadt, z. B. Barcelona" />
+          <TextInput value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} type="number" min="1" max="21" placeholder="Tage" />
+          <Select value={form.tripType} onChange={(e) => setForm({ ...form, tripType: e.target.value })}>
+            <option>Kultururlaub</option>
+            <option>Strandurlaub</option>
+            <option>Gemischt</option>
+          </Select>
+          <Button disabled={loading}>{loading ? 'Plane...' : 'Reise generieren'}</Button>
+        </form>
+      </Card>
+
+      {!!savedTrips.length && (
+        <Card>
+          <h2 className="mb-3 font-semibold">Gespeicherte Reisen</h2>
+          <div className="flex flex-wrap gap-2">
+            {savedTrips.map((trip) => <Button key={trip.id} type="button" onClick={() => setPlan(trip.plan)}>{trip.destination}</Button>)}
+          </div>
+        </Card>
+      )}
+
+      {plan && (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
+            <Card>
+              <h2 className="text-xl font-semibold">{plan.city} - {plan.durationDays} Tage - {plan.tripType}</h2>
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{plan.cultureInfo}</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <h3 className="font-semibold">Verhaltenstipps</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">{(plan.behaviorTips || []).map((tip) => <li key={tip}>{tip}</li>)}</ul>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Fun Facts</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">{(plan.funFacts || []).map((fact) => <li key={fact}>{fact}</li>)}</ul>
+                </div>
+              </div>
+            </Card>
+            <Card className="overflow-hidden p-0">
+              <iframe
+                title="Karte"
+                className="h-full min-h-[320px] w-full"
+                loading="lazy"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(plan.city)}&z=13&output=embed`}
+              />
+            </Card>
+          </div>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            {plan.days.map((day, dayIndex) => (
+              <Card
+                key={day.day}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => drag && moveActivity(drag.dayIndex, drag.activityIndex, dayIndex)}
+              >
+                <h3 className="mb-3 font-semibold">Tag {day.day}</h3>
+                <div className="space-y-3">
+                  {day.activities.map((activity, activityIndex) => (
+                    <article
+                      key={`${activity.name}-${activityIndex}`}
+                      draggable
+                      onDragStart={() => setDrag({ dayIndex, activityIndex })}
+                      onDragEnd={() => setDrag(null)}
+                      className="grid gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:grid-cols-[110px_1fr]"
+                    >
+                      {activity.imageUrl && <img src={activity.imageUrl} alt="" className="h-24 w-full rounded-md object-cover" />}
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-semibold">{activity.name}</h4>
+                          <span className="rounded bg-white px-2 py-1 text-xs dark:bg-zinc-900">{activity.rating}/5</span>
+                        </div>
+                        <p className="mt-1 line-clamp-3 text-zinc-600 dark:text-zinc-300">{activity.description}</p>
+                        <p className="mt-2 text-xs text-zinc-500">{activity.category} - {activity.coordinates.lat.toFixed(4)}, {activity.coordinates.lng.toFixed(4)}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </section>
+
+          <Card>
+            <h2 className="mb-3 font-semibold">Hotelvorschläge</h2>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {plan.hotels.map((hotel) => (
+                <article key={hotel.name} className="overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
+                  {hotel.imageUrl && <img src={hotel.imageUrl} alt="" className="aspect-video w-full object-cover" />}
+                  <div className="p-3 text-sm">
+                    <h3 className="font-semibold">{hotel.name}</h3>
+                    <p className="mt-1 text-zinc-500">{hotel.price} - {hotel.rating}/5</p>
+                    <p className="mt-2 text-zinc-600 dark:text-zinc-300">{hotel.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
   );
 }
 
