@@ -380,7 +380,7 @@ function Stocks({ api }) {
                 {Number(item.changePercent) >= 0 ? '+' : ''}{Number(item.changePercent).toFixed(2)}%
               </p>
             )}
-            <p className="mt-3 text-xs text-zinc-500">Stand: {item.updatedAt || 'offen'} · Quelle: {item.source || 'Alpha Vantage'}</p>
+            <p className="mt-3 text-xs text-zinc-500">Stand: {item.updatedAt || (item.cached ? 'Cache' : 'offen')} · Quelle: {item.source || 'Alpha Vantage'}{item.cached ? ' · Cache' : ''}</p>
             {item.status && <p className="mt-2 text-xs text-red-600">{item.status}</p>}
           </Card>
         ))}

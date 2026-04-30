@@ -972,6 +972,20 @@ crudRoutes('finance', 'financeEntry', (body) => ({
   date: parseDate(body.date) || new Date()
 }));
 
+const marketCacheFile = path.join(uploadDir, 'market-cache.json');
+const marketFallbackValues = {
+  gold: 2320,
+  silver: 29,
+  oil: 78,
+  copper: 4.4,
+  btc: 65000,
+  eth: 3200,
+  hbar: 0.08,
+  nasdaq: 74,
+  us100: 430,
+  dax: 31,
+  sp500: 510
+};
 const marketCache = { at: 0, data: null };
 const marketAssets = [
   { id: 'gold', name: 'Gold', type: 'fx', from: 'XAU', to: 'USD', unit: 'USD/oz' },
@@ -986,6 +1000,38 @@ const marketAssets = [
   { id: 'dax', name: 'DAX', type: 'quote', symbol: 'DAX', unit: 'USD', note: 'Proxy: DAX ETF' },
   { id: 'sp500', name: 'S&P500', type: 'quote', symbol: 'SPY', unit: 'USD', note: 'Proxy: SPY ETF' }
 ];
+
+function readMarketCache() {
+  if (marketCache.data) return marketCache;
+  try {
+    if (!fs.existsSync(marketCacheFile)) return marketCache;
+    const saved = JSON.parse(fs.readFileSync(marketCacheFile, 'utf8'));
+    marketCache.at = saved.at || 0;
+    marketCache.data = saved.data || null;
+  } catch {
+    marketCache.at = 0;
+    marketCache.data = null;
+  }
+  return marketCache;
+}
+
+function writeMarketCache(data) {
+  marketCache.at = Date.now();
+  marketCache.data = data;
+  fs.mkdirSync(path.dirname(marketCacheFile), { recursive: true });
+  fs.writeFileSync(marketCacheFile, JSON.stringify({ at: marketCache.at, data }, null, 2));
+}
+
+function fallbackMarketData(status = 'Alpha Vantage Tageslimit erreicht oder noch kein Cache vorhanden.') {
+  return marketAssets.map((asset) => ({
+    ...asset,
+    value: marketFallbackValues[asset.id] || null,
+    changePercent: null,
+    updatedAt: null,
+    source: 'Fallback',
+    status
+  }));
+}
 
 async function alphaRequest(params) {
   const url = new URL('https://www.alphavantage.co/query');
@@ -1042,10 +1088,22 @@ async function marketAsset(asset) {
 
 app.get('/api/markets', auth, async (_req, res) => {
   const now = Date.now();
-  if (marketCache.data && now - marketCache.at < 15 * 60 * 1000) return res.json(marketCache.data);
-  const data = await Promise.all(marketAssets.map(marketAsset));
-  marketCache.at = now;
-  marketCache.data = data;
+  const saved = readMarketCache();
+  if (saved.data && now - saved.at < 24 * 60 * 60 * 1000) {
+    return res.json(saved.data.map((item) => ({ ...item, cached: true })));
+  }
+  if (!process.env.ALPHAVANTAGE_API_KEY) return res.json(saved.data || fallbackMarketData('ALPHAVANTAGE_API_KEY fehlt'));
+
+  const data = [];
+  for (const asset of marketAssets) {
+    const item = await marketAsset(asset);
+    if (/rate limit|premium|25 requests|Thank you for using Alpha Vantage/i.test(item.status || '')) {
+      return res.json(saved.data || fallbackMarketData(item.status));
+    }
+    data.push(item);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+  writeMarketCache(data);
   res.json(data);
 });
 
