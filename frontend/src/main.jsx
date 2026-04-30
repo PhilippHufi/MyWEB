@@ -392,15 +392,58 @@ function Stocks({ api }) {
 
 function Tasks({ api }) {
   const { items, add, update, remove } = useCollection(api, 'tasks');
-  const [form, setForm] = useState({ title: '', category: 'Privat', priority: 'mittel', dueDate: '', notes: '' });
+  const emptyForm = { title: '', notes: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [editing, setEditing] = useState(null);
+
+  async function saveTask() {
+    const payload = { ...form, category: 'Allgemein', priority: 'mittel', dueDate: '', completed: editing?.completed || false };
+    if (editing) {
+      await update(editing.id, payload);
+    } else {
+      await add(payload);
+    }
+    setForm(emptyForm);
+    setEditing(null);
+  }
+
+  function editTask(item) {
+    setEditing(item);
+    setForm({ title: item.title || '', notes: item.notes || '' });
+  }
+
   return (
-    <Module title="To-do Liste" onSubmit={() => add(form)} form={form} setForm={setForm}>
-      <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Aufgabe" />
-      <TextInput value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategorie" />
-      <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>niedrig</option><option>mittel</option><option>hoch</option></Select>
-      <TextInput value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} type="date" />
-      <List items={items} remove={remove} render={(item) => <label className="flex items-center gap-2"><input type="checkbox" checked={item.completed} onChange={(e) => update(item.id, { completed: e.target.checked })} /> <span className={item.completed ? 'line-through text-zinc-500' : ''}>{item.title} - {item.category} - {item.priority}</span></label>} />
-    </Module>
+    <div className="space-y-4">
+      <Card>
+        <h2 className="mb-3 text-lg font-semibold">{editing ? 'To-do bearbeiten' : 'To-do hinzufügen'}</h2>
+        <form onSubmit={(event) => { event.preventDefault(); saveTask(); }} className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Aufgabe" />
+          <Button>{editing ? 'Speichern' : 'Hinzufügen'}</Button>
+          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notiz optional" className="input min-h-24 md:col-span-2" />
+        </form>
+        {editing && <Button type="button" className="mt-3 bg-zinc-600" onClick={() => { setEditing(null); setForm(emptyForm); }}>Abbrechen</Button>}
+      </Card>
+      <Card>
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={item.id} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <div className="flex items-start justify-between gap-3">
+                <label className="flex min-w-0 items-start gap-2">
+                  <input type="checkbox" className="mt-1" checked={Boolean(item.completed)} onChange={(e) => update(item.id, { ...item, completed: e.target.checked })} />
+                  <span className={item.completed ? 'line-through text-zinc-500' : 'font-medium'}>{item.title}</span>
+                </label>
+                <div className="flex gap-2">
+                  <Button type="button" className="bg-zinc-700" onClick={() => editTask(item)}>Bearbeiten</Button>
+                  <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+              {item.notes && <p className="mt-2 whitespace-pre-wrap text-zinc-600 dark:text-zinc-300">{item.notes}</p>}
+            </div>
+          ))}
+          {!items.length && <p className="text-sm text-zinc-500">Noch keine To-dos.</p>}
+        </div>
+      </Card>
+    </div>
   );
 }
 

@@ -1053,7 +1053,7 @@ crudRoutes('tasks', 'task', (body) => ({
   title: body.title,
   category: body.category || 'Allgemein',
   priority: body.priority || 'mittel',
-  dueDate: parseDate(body.dueDate),
+  dueDate: body.dueDate ? parseDate(body.dueDate) : null,
   completed: Boolean(body.completed),
   notes: body.notes || null
 }));
