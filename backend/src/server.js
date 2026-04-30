@@ -23,7 +23,7 @@ app.use(cors());
 app.use(express.json());
 
 function signUser(user) {
-  return jwt.sign({ sub: user.id, email: user.email }, jwtSecret, { expiresIn: '7d' });
+  return jwt.sign({ sub: user.id, username: user.email }, jwtSecret, { expiresIn: '7d' });
 }
 
 function auth(req, res, next) {
@@ -71,12 +71,13 @@ function crudRoutes(path, model, mapInput = (body) => body, include) {
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const { username, email, password } = req.body;
+  const login = username || email;
+  const user = await prisma.user.findUnique({ where: { email: login } });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Invalid login' });
   }
-  res.json({ token: signUser(user), user: { id: user.id, email: user.email } });
+  res.json({ token: signUser(user), user: { id: user.id, username: user.email } });
 });
 
 app.get('/api/dashboard', auth, async (_req, res) => {

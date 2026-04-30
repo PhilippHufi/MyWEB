@@ -40,7 +40,7 @@ Then open http://localhost:4000. Express serves the built React web app and the 
 
 Default login after seeding:
 
-- Email: `me@example.com`
+- Benutzer: `admin`
 - Password: `dashboard123`
 
 ## API Keys

@@ -84,7 +84,7 @@ function Button({ children, className = '', ...props }) {
 }
 
 function Login({ onLogin }) {
-  const [email, setEmail] = useState('me@example.com');
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('dashboard123');
   const [error, setError] = useState('');
 
@@ -95,7 +95,7 @@ function Login({ onLogin }) {
       const response = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ username, password })
       });
       if (!response.ok) throw new Error('Login fehlgeschlagen');
       const data = await response.json();
@@ -111,7 +111,7 @@ function Login({ onLogin }) {
         <h1 className="text-xl font-semibold">Personal Dashboard</h1>
         <p className="mt-1 text-sm text-zinc-500">Melde dich lokal an.</p>
         <div className="mt-5 space-y-3">
-          <TextInput value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" />
+          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Benutzer" />
           <TextInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Passwort" type="password" />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <Button className="w-full">Einloggen</Button>

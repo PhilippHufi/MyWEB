@@ -33,7 +33,7 @@ Die wichtigsten Werte:
 
 ```text
 JWT_SECRET=<langes-zufaelliges-passwort>
-DEFAULT_USER_EMAIL=<deine-login-email>
+DEFAULT_USERNAME=<dein-benutzername>
 DEFAULT_USER_PASSWORD=<dein-sicheres-login-passwort>
 ```
 

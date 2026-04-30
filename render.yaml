@@ -19,7 +19,7 @@ services:
         value: 4000
       - key: JWT_SECRET
         sync: false
-      - key: DEFAULT_USER_EMAIL
+      - key: DEFAULT_USERNAME
         sync: false
       - key: DEFAULT_USER_PASSWORD
         sync: false

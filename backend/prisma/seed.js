@@ -7,7 +7,7 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.DEFAULT_USER_EMAIL || 'me@example.com';
+  const email = process.env.DEFAULT_USERNAME || process.env.DEFAULT_USER_EMAIL || 'admin';
   const password = process.env.DEFAULT_USER_PASSWORD || 'dashboard123';
   const passwordHash = await bcrypt.hash(password, 10);
 
