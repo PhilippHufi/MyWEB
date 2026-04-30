@@ -62,22 +62,20 @@ function fallbackWeather() {
   };
 }
 
-function fallbackNewsItems(category) {
-  const items = {
-    technology: [
-      ['Tagesschau Technik', 'https://www.tagesschau.de/wirtschaft/technologie/', 'Technik- und Digitalthemen oeffnen.'],
-      ['Heise News', 'https://www.heise.de/news/', 'IT, Software, Hardware und Netzpolitik.']
-    ],
-    business: [
-      ['Tagesschau Wirtschaft', 'https://www.tagesschau.de/wirtschaft/', 'Wirtschaftsnachrichten oeffnen.'],
-      ['Finanzen.net', 'https://www.finanzen.net/', 'Boerse, Wirtschaft und Finanznachrichten.']
-    ],
-    health: [
-      ['Tagesschau Gesundheit', 'https://www.tagesschau.de/thema/gesundheit/', 'Gesundheitsthemen oeffnen.'],
-      ['Robert Koch-Institut', 'https://www.rki.de/', 'Offizielle Gesundheitsinformationen.']
-    ]
+function fallbackNewsItems(scope = 'at', type = 'articles') {
+  const audio = {
+    at: [['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Oesterreich.']],
+    de: [['Deutschlandfunk Nachrichten', 'https://www.deutschlandfunk.de/nachrichten-100.html', 'Nachrichten aus Deutschland als Audio.']],
+    us: [['NPR News Now', 'https://www.npr.org/podcasts/500005/npr-news-now', 'US-Nachrichten als Audio.']],
+    world: [['BBC Global News Podcast', 'https://www.bbc.co.uk/programmes/p02nq0gn/episodes/downloads', 'Weltweite Nachrichten als Audio.']]
   };
-  return (items[category] || items.technology).map(([title, url, description]) => ({ title, url, description, source: 'Fallback', category }));
+  const items = {
+    at: [['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Oesterreich.']],
+    de: [['Tagesschau', 'https://www.tagesschau.de/', 'Aktuelle Nachrichten aus Deutschland.']],
+    us: [['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.']],
+    world: [['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.']]
+  };
+  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description]) => ({ title, url, description, source: 'Fallback', category: scope, type }));
 }
 
 function getLocal(key) {
@@ -618,15 +616,64 @@ function MediaCard({ item, onSave, onDelete, onUpdate }) {
 
 function News({ api }) {
   const bookmarks = useCollection(api, 'news/bookmarks');
-  const [category, setCategory] = useState('technology');
+  const [scope, setScope] = useState('at');
+  const [type, setType] = useState('articles');
   const [items, setItems] = useState([]);
-  useEffect(() => { api.request(`news?category=${category}`).then(setItems).catch(() => setItems(fallbackNewsItems(category))); }, [category]);
+  const [openSaved, setOpenSaved] = useState(null);
+
+  useEffect(() => {
+    api.request(`news?scope=${scope}&type=${type}`).then(setItems).catch(() => setItems(fallbackNewsItems(scope, type)));
+  }, [scope, type]);
+
   return (
     <div className="space-y-4">
-      <Select value={category} onChange={(e) => setCategory(e.target.value)} className="max-w-xs"><option value="technology">Tech</option><option value="business">Business</option><option value="health">Gesundheit</option></Select>
-      <div className="grid gap-4 md:grid-cols-2">{items.map((item) => <Card key={item.url}><h3 className="font-semibold">{item.title}</h3><p className="mt-2 text-sm text-zinc-500">{item.description}</p><Button className="mt-4" onClick={() => bookmarks.add(item)}><Plus className="h-4 w-4" />Merken</Button></Card>)}</div>
+      <Card>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Select value={scope} onChange={(e) => setScope(e.target.value)}>
+            <option value="at">Oesterreich</option>
+            <option value="de">Deutschland</option>
+            <option value="us">Amerika</option>
+            <option value="world">Weltweit</option>
+          </Select>
+          <Select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="articles">Leseartikel</option>
+            <option value="audio">Audio</option>
+          </Select>
+        </div>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        {items.map((item) => (
+          <Card key={item.url}>
+            <p className="text-xs uppercase text-zinc-500">{item.source || 'News'} - {item.type === 'audio' ? 'Audio' : 'Artikel'}</p>
+            <h3 className="mt-1 font-semibold">{item.title}</h3>
+            <p className="mt-2 text-sm text-zinc-500">{item.description}</p>
+            <div className="mt-4 flex gap-2">
+              <Button type="button" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>{item.type === 'audio' ? 'Anhoeren' : 'Lesen'}</Button>
+              <Button type="button" onClick={() => bookmarks.add(item)}><Plus className="h-4 w-4" />Merken</Button>
+            </div>
+          </Card>
+        ))}
+      </div>
       <h2 className="font-semibold">Gemerkte News</h2>
-      <List items={bookmarks.items} remove={bookmarks.remove} render={(item) => <a href={item.url} target="_blank" rel="noreferrer">{item.title}</a>} />
+      <Card>
+        <div className="space-y-2">
+          {bookmarks.items.map((item) => (
+            <div key={item.id} className="rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" className="min-w-0 text-left font-medium" onClick={() => setOpenSaved(openSaved === item.id ? null : item.id)}>{item.title}</button>
+                <button type="button" className="icon-btn" onClick={() => bookmarks.remove(item.id)} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              {openSaved === item.id && (
+                <div className="mt-3 space-y-2 text-zinc-600 dark:text-zinc-300">
+                  <p>{item.description || 'Keine Beschreibung gespeichert.'}</p>
+                  <a href={item.url} target="_blank" rel="noreferrer" className="underline">{item.type === 'audio' ? 'Audio oeffnen' : 'Artikel oeffnen'}</a>
+                </div>
+              )}
+            </div>
+          ))}
+          {!bookmarks.items.length && <p className="text-sm text-zinc-500">Noch keine News gespeichert.</p>}
+        </div>
+      </Card>
     </div>
   );
 }

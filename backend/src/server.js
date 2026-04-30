@@ -63,26 +63,50 @@ function parseDate(value) {
   return value ? new Date(value) : null;
 }
 
-function fallbackNews(category) {
-  const items = {
-    technology: [
-      ['Tagesschau Technik', 'https://www.tagesschau.de/wirtschaft/technologie/', 'Aktuelle Technik- und Digitalthemen ohne NewsAPI-Key oeffnen.'],
-      ['Heise News', 'https://www.heise.de/news/', 'IT, Software, Hardware und Netzpolitik.']
+function fallbackNews(scope = 'at', type = 'articles') {
+  const audio = {
+    at: [
+      ['ORF OE1 Journale', 'https://oe1.orf.at/player', 'Aktuelle Audio-Journale aus Oesterreich.'],
+      ['ORF Sound', 'https://sound.orf.at/', 'Nachrichten, Podcasts und Sendungen zum Anhoeren.']
     ],
-    business: [
-      ['Tagesschau Wirtschaft', 'https://www.tagesschau.de/wirtschaft/', 'Aktuelle Wirtschaftsuebersicht ohne NewsAPI-Key oeffnen.'],
-      ['Finanzen.net', 'https://www.finanzen.net/', 'Boerse, Wirtschaft und Finanznachrichten.']
+    de: [
+      ['Deutschlandfunk Nachrichten', 'https://www.deutschlandfunk.de/nachrichten-100.html', 'Aktuelle Nachrichten aus Deutschland als Audio und Text.'],
+      ['Tagesschau in 100 Sekunden', 'https://www.tagesschau.de/multimedia/sendung/tagesschau_in_100_sekunden/', 'Kurzer Nachrichtenueberblick zum Ansehen und Anhoeren.']
     ],
-    health: [
-      ['Tagesschau Gesundheit', 'https://www.tagesschau.de/thema/gesundheit/', 'Gesundheitsthemen und aktuelle Meldungen.'],
-      ['Robert Koch-Institut', 'https://www.rki.de/', 'Offizielle Gesundheitsinformationen.']
+    us: [
+      ['NPR News Now', 'https://www.npr.org/podcasts/500005/npr-news-now', 'Aktuelle US-Nachrichten als Audio.'],
+      ['PBS NewsHour', 'https://www.pbs.org/newshour/podcasts', 'US- und Weltpolitik als Podcast.']
+    ],
+    world: [
+      ['BBC Global News Podcast', 'https://www.bbc.co.uk/programmes/p02nq0gn/episodes/downloads', 'Weltweite Nachrichten als Audio.'],
+      ['DW News', 'https://www.dw.com/de/media-center/s-100824', 'Internationale Nachrichten der Deutschen Welle.']
     ]
   };
-  return (items[category] || items.technology).map(([title, url, description]) => ({
+
+  const items = {
+    at: [
+      ['ORF News', 'https://orf.at/', 'Aktuelle Nachrichten aus Oesterreich.'],
+      ['Der Standard', 'https://www.derstandard.at/', 'Nachrichten und Hintergruende aus Oesterreich.']
+    ],
+    de: [
+      ['Tagesschau', 'https://www.tagesschau.de/', 'Aktuelle Nachrichten aus Deutschland.'],
+      ['ZDFheute', 'https://www.zdf.de/nachrichten', 'Nachrichten und Videos aus Deutschland.']
+    ],
+    us: [
+      ['NPR', 'https://www.npr.org/sections/news/', 'Aktuelle Nachrichten aus Amerika.'],
+      ['PBS NewsHour', 'https://www.pbs.org/newshour/', 'US-Nachrichten und Hintergruende.']
+    ],
+    world: [
+      ['BBC News', 'https://www.bbc.com/news', 'Weltweite Nachrichten.'],
+      ['Deutsche Welle', 'https://www.dw.com/de/themen/s-9077', 'Internationale Nachrichten auf Deutsch.']
+    ]
+  };
+  return (type === 'audio' ? audio[scope] || audio.world : items[scope] || items.at).map(([title, url, description]) => ({
     title,
     url,
     source: 'Fallback',
-    category,
+    category: scope,
+    type,
     description,
     imageUrl: null
   }));
@@ -468,29 +492,40 @@ app.get('/api/media/discover', auth, async (req, res) => {
 });
 
 app.get('/api/news', auth, async (req, res) => {
-  const category = String(req.query.category || 'technology');
+  const scope = String(req.query.scope || 'at');
+  const type = String(req.query.type || 'articles');
+  const countries = { at: 'at', de: 'de', us: 'us' };
+  if (type === 'audio') {
+    return res.json(fallbackNews(scope, type));
+  }
+
   if (process.env.NEWS_API_KEY) {
     try {
       const url = new URL('https://newsapi.org/v2/top-headlines');
-      url.searchParams.set('country', 'de');
-      url.searchParams.set('category', category);
+      if (scope === 'world') {
+        url.searchParams.set('language', 'de');
+      } else {
+        url.searchParams.set('country', countries[scope] || 'at');
+      }
       url.searchParams.set('apiKey', process.env.NEWS_API_KEY);
       const response = await fetch(url);
       if (!response.ok) throw new Error('NewsAPI request failed');
       const data = await response.json();
-      return res.json((data.articles || []).map((article) => ({
+      const articles = (data.articles || []).map((article) => ({
         title: article.title,
         url: article.url,
         source: article.source?.name,
-        category,
+        category: scope,
+        type: 'articles',
         description: article.description,
         imageUrl: article.urlToImage
-      })));
+      }));
+      if (articles.length) return res.json(articles);
     } catch (error) {
       console.error(error);
     }
   }
-  res.json(fallbackNews(category));
+  res.json(fallbackNews(scope, type));
 });
 
 app.get('/api/weather', auth, async (_req, res) => {
