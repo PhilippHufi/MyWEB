@@ -1062,14 +1062,31 @@ function Travel({ api }) {
           city: form.city,
           durationDays: Number(form.durationDays),
           tripType: form.tripType,
-          save: true
+          save: false
         })
       });
       setPlan(generated);
-      await loadTrips();
     } finally {
       setLoading(false);
     }
+  }
+
+  async function saveCurrentTrip() {
+    if (!plan || plan.savedTripId) return;
+    const saved = await api.request('trips', {
+      method: 'POST',
+      body: JSON.stringify({
+        destination: plan.city,
+        startDate: new Date().toISOString().slice(0, 10),
+        endDate: new Date(Date.now() + (Number(plan.durationDays || 1) - 1) * 86400000).toISOString().slice(0, 10),
+        durationDays: plan.durationDays,
+        tripType: plan.tripType,
+        notes: plan.cultureInfo,
+        planJson: plan
+      })
+    });
+    setPlan({ ...plan, savedTripId: saved.id });
+    await loadTrips();
   }
 
   function moveActivity(fromDay, fromIndex, toDay, toIndex = null) {
@@ -1143,7 +1160,10 @@ function Travel({ api }) {
         <>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
             <Card>
-              <h2 className="text-xl font-semibold">{plan.city} - {plan.durationDays} Tage - {plan.tripType}</h2>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-xl font-semibold">{plan.city} - {plan.durationDays} Tage - {plan.tripType}</h2>
+                <Button type="button" onClick={saveCurrentTrip} disabled={Boolean(plan.savedTripId)}>{plan.savedTripId ? 'Gespeichert' : 'Reise speichern'}</Button>
+              </div>
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{plan.cultureInfo}</p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <div>
@@ -1183,7 +1203,7 @@ function Travel({ api }) {
                       onDragEnd={() => setDrag(null)}
                       className="grid gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:grid-cols-[110px_1fr]"
                     >
-                      <img src={activity.imageUrl} alt="" className="h-24 w-full rounded-md object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                      <img src={activity.imageUrl} alt="" className="h-24 w-full rounded-md object-cover" onError={(event) => { event.currentTarget.src = `https://placehold.co/440x260/386641/ffffff?text=${encodeURIComponent(activity.name)}`; }} />
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="font-semibold">{activity.name}</h4>
@@ -1205,7 +1225,7 @@ function Travel({ api }) {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {plan.hotels.map((hotel) => (
                 <article key={hotel.name} className="overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-800">
-                  <img src={hotel.imageUrl} alt="" className="aspect-video w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                  <img src={hotel.imageUrl} alt="" className="aspect-video w-full object-cover" onError={(event) => { event.currentTarget.src = `https://placehold.co/640x360/2f6690/ffffff?text=${encodeURIComponent(hotel.name)}`; }} />
                   <div className="p-3 text-sm">
                     <h3 className="font-semibold">{hotel.name}</h3>
                     <p className="mt-1 text-zinc-500">{hotel.price} - {hotel.rating}/5</p>

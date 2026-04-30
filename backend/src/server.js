@@ -156,23 +156,45 @@ async function wikiSummary(title) {
   return response.json();
 }
 
-async function commonsImage(query) {
-  const url = new URL('https://commons.wikimedia.org/w/api.php');
+async function wikiImage(title) {
+  const url = new URL('https://de.wikipedia.org/w/api.php');
   url.searchParams.set('action', 'query');
-  url.searchParams.set('generator', 'search');
-  url.searchParams.set('gsrsearch', query);
-  url.searchParams.set('gsrnamespace', '6');
-  url.searchParams.set('gsrlimit', '1');
-  url.searchParams.set('prop', 'imageinfo');
-  url.searchParams.set('iiprop', 'url');
-  url.searchParams.set('iiurlwidth', '900');
+  url.searchParams.set('titles', title);
+  url.searchParams.set('prop', 'pageimages');
+  url.searchParams.set('pithumbsize', '900');
   url.searchParams.set('format', 'json');
   url.searchParams.set('origin', '*');
   const response = await fetch(url);
   if (!response.ok) return null;
   const data = await response.json();
   const page = Object.values(data.query?.pages || {})[0];
-  return page?.imageinfo?.[0]?.thumburl || page?.imageinfo?.[0]?.url || null;
+  return page?.thumbnail?.source || null;
+}
+
+async function commonsImage(query) {
+  const queries = [query, `${query} landmark`, `${query} city`];
+  for (const search of queries) {
+  const url = new URL('https://commons.wikimedia.org/w/api.php');
+  url.searchParams.set('action', 'query');
+  url.searchParams.set('generator', 'search');
+  url.searchParams.set('gsrsearch', `filetype:bitmap ${search}`);
+  url.searchParams.set('gsrnamespace', '6');
+  url.searchParams.set('gsrlimit', '8');
+  url.searchParams.set('prop', 'imageinfo');
+  url.searchParams.set('iiprop', 'url|mime|size');
+  url.searchParams.set('iiurlwidth', '900');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('origin', '*');
+  const response = await fetch(url);
+  if (!response.ok) continue;
+  const data = await response.json();
+    const pages = Object.values(data.query?.pages || {});
+    const image = pages
+      .map((page) => page.imageinfo?.[0])
+      .find((info) => info?.mime?.startsWith('image/') && !/svg|gif/i.test(info.mime));
+    if (image?.thumburl || image?.url) return image.thumburl || image.url;
+  }
+  return null;
 }
 
 async function cityPlaces(city, tripType) {
@@ -189,7 +211,7 @@ async function cityPlaces(city, tripType) {
   const raw = data.query?.geosearch || [];
   const summaries = await Promise.all(raw.slice(0, 24).map(async (place) => {
     const summary = await wikiSummary(place.title);
-    const imageUrl = summary?.originalimage?.source || summary?.thumbnail?.source || await commonsImage(`${place.title} ${city.name}`);
+    const imageUrl = summary?.originalimage?.source || summary?.thumbnail?.source || await wikiImage(place.title) || await commonsImage(`${place.title} ${city.name}`);
     return {
       name: place.title,
       coordinates: { lat: place.lat, lng: place.lon },
