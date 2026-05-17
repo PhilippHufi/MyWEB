@@ -6,6 +6,8 @@ frontend/dist/
 backend/.env
 backend/prisma/dev.db
 backend/prisma/*.db
+backend/prisma/backups/
+backend/prisma/prisma/
 
 *.log
 npm-debug.log*

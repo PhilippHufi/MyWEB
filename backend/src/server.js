@@ -794,7 +794,373 @@ function crudRoutes(path, model, mapInput = (body) => body, include) {
   });
 }
 
+function appBaseUrl(req) {
+  return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+function googleTokenFile() {
+  return path.join(uploadDir, 'google-calendar-tokens.json');
+}
+
+function readGoogleTokens() {
+  try {
+    return JSON.parse(fs.readFileSync(googleTokenFile(), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeGoogleTokens(tokens) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  fs.writeFileSync(googleTokenFile(), JSON.stringify(tokens, null, 2));
+}
+
+async function refreshGoogleTokens(tokens) {
+  if (!tokens?.refresh_token) return tokens;
+  if (tokens.expires_at && Date.now() < tokens.expires_at - 60000) return tokens;
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID || '',
+    client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+    refresh_token: tokens.refresh_token,
+    grant_type: 'refresh_token'
+  });
+  const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body: params });
+  if (!response.ok) throw new Error('Google token refresh failed');
+  const data = await response.json();
+  const next = {
+    ...tokens,
+    ...data,
+    refresh_token: data.refresh_token || tokens.refresh_token,
+    expires_at: Date.now() + Number(data.expires_in || 3600) * 1000
+  };
+  writeGoogleTokens(next);
+  return next;
+}
+
+async function googleRequest(pathname, options = {}) {
+  let tokens = readGoogleTokens();
+  if (!tokens) {
+    const error = new Error('Google Calendar is not connected');
+    error.status = 401;
+    throw error;
+  }
+  tokens = await refreshGoogleTokens(tokens);
+  const response = await fetch(`https://www.googleapis.com/calendar/v3${pathname}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${tokens.access_token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    const error = new Error(await response.text());
+    error.status = response.status;
+    throw error;
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+function mapCalendarEvent(event) {
+  const start = event.start?.dateTime || event.start?.date;
+  const end = event.end?.dateTime || event.end?.date;
+  return {
+    id: event.id,
+    title: event.summary || 'Ohne Titel',
+    location: event.location || '',
+    start,
+    end,
+    link: event.htmlLink
+  };
+}
+
+function trelloCredentials() {
+  return { key: process.env.TRELLO_API_KEY, token: process.env.TRELLO_TOKEN };
+}
+
+async function trelloRequest(pathname, params = {}) {
+  const { key, token } = trelloCredentials();
+  if (!key || !token) {
+    const error = new Error('Trello is not configured');
+    error.status = 400;
+    throw error;
+  }
+  const url = new URL(`https://api.trello.com/1${pathname}`);
+  url.searchParams.set('key', key);
+  url.searchParams.set('token', token);
+  for (const [name, value] of Object.entries(params)) {
+    if (value != null && value !== '') url.searchParams.set(name, value);
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    const error = new Error(await response.text());
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/api/life/weather', auth, async (req, res) => {
+  try {
+    if (!process.env.OPENWEATHER_API_KEY) return res.status(400).json({ error: 'OPENWEATHER_API_KEY fehlt' });
+    const city = String(req.query.city || process.env.WEATHER_CITY || process.env.WEATHER_LABEL || 'Linz').trim();
+    const url = new URL('https://api.openweathermap.org/data/2.5/weather');
+    url.searchParams.set('q', city);
+    url.searchParams.set('units', 'metric');
+    url.searchParams.set('lang', 'de');
+    url.searchParams.set('appid', process.env.OPENWEATHER_API_KEY);
+    const response = await fetch(url);
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(details || 'OpenWeatherMap request failed');
+    }
+    const data = await response.json();
+    res.json({
+      city: data.name,
+      temperature: Math.round(data.main?.temp),
+      status: data.weather?.[0]?.description || 'Unbekannt',
+      humidity: data.main?.humidity,
+      wind: data.wind?.speed,
+      sunrise: data.sys?.sunrise ? new Date(data.sys.sunrise * 1000).toISOString() : null,
+      sunset: data.sys?.sunset ? new Date(data.sys.sunset * 1000).toISOString() : null,
+      icon: data.weather?.[0]?.icon || null
+    });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.get('/api/life/quote', auth, async (_req, res) => {
+  try {
+    const response = await fetch('https://api.quotable.io/random');
+    if (!response.ok) throw new Error('Quote request failed');
+    const data = await response.json();
+    res.json({ content: data.content, author: data.author });
+  } catch (error) {
+    res.json({
+      content: 'Kleine Schritte, sauber dokumentiert, bauen ein System, auf das man sich verlassen kann.',
+      author: 'MyWEB'
+    });
+  }
+});
+
+app.get('/api/life/joke', auth, async (_req, res) => {
+  try {
+    const response = await fetch('https://official-joke-api.appspot.com/random_joke');
+    if (!response.ok) throw new Error('Joke request failed');
+    const data = await response.json();
+    res.json({ setup: data.setup, punchline: data.punchline });
+  } catch (error) {
+    res.json({ setup: 'Warum mag ein Dashboard gute Backups?', punchline: 'Weil es dann nicht jeden Tag von vorne anfangen muss.' });
+  }
+});
+
+app.get('/api/life/music/search', auth, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const provider = String(req.query.provider || 'audius');
+    if (!q) return res.json([]);
+    if (provider === 'jamendo') {
+      if (!process.env.JAMENDO_CLIENT_ID) return res.status(400).json({ error: 'JAMENDO_CLIENT_ID fehlt' });
+      const url = new URL('https://api.jamendo.com/v3.0/tracks/');
+      url.searchParams.set('client_id', process.env.JAMENDO_CLIENT_ID);
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('limit', '20');
+      url.searchParams.set('audioformat', 'mp32');
+      url.searchParams.set('search', q);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Jamendo request failed');
+      const data = await response.json();
+      return res.json((data.results || []).map((track) => ({
+        id: `jamendo-${track.id}`,
+        provider: 'jamendo',
+        title: track.name,
+        artist: track.artist_name,
+        artwork: track.album_image,
+        streamUrl: track.audio,
+        duration: Number(track.duration || 0)
+      })));
+    }
+
+    const hostResponse = await fetch('https://api.audius.co');
+    const hostData = await hostResponse.json();
+    const host = hostData.data?.[0] || 'https://discoveryprovider.audius.co';
+    const url = new URL(`${host}/v1/tracks/search`);
+    url.searchParams.set('query', q);
+    url.searchParams.set('limit', '20');
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Audius request failed');
+    const data = await response.json();
+    res.json((data.data || []).map((track) => ({
+      id: `audius-${track.id}`,
+      provider: 'audius',
+      title: track.title,
+      artist: track.user?.name || 'Audius',
+      artwork: track.artwork?.['480x480'] || track.artwork?.['150x150'] || null,
+      streamUrl: `${host}/v1/tracks/${track.id}/stream`,
+      duration: Number(track.duration || 0)
+    })));
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.get('/api/life/google/auth-url', auth, (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID) return res.status(400).json({ error: 'GOOGLE_CLIENT_ID fehlt' });
+  const redirectUri = `${appBaseUrl(req)}/google/callback`;
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+  url.searchParams.set('scope', 'https://www.googleapis.com/auth/calendar');
+  res.json({ url: url.toString(), redirectUri });
+});
+
+app.post('/api/life/google/exchange', auth, async (req, res) => {
+  try {
+    const code = String(req.body.code || '');
+    const redirectUri = String(req.body.redirectUri || `${appBaseUrl(req)}/google/callback`);
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code'
+    });
+    const response = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', body: params });
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    writeGoogleTokens({ ...data, expires_at: Date.now() + Number(data.expires_in || 3600) * 1000 });
+    res.json({ connected: true });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.get('/api/life/google/events', auth, async (_req, res) => {
+  try {
+    const now = new Date();
+    const week = new Date(now);
+    week.setDate(now.getDate() + 7);
+    const params = new URLSearchParams({
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      timeMin: now.toISOString(),
+      timeMax: week.toISOString(),
+      maxResults: '40'
+    });
+    const data = await googleRequest(`/calendars/primary/events?${params.toString()}`);
+    res.json((data.items || []).map(mapCalendarEvent));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.post('/api/life/google/events', auth, async (req, res) => {
+  try {
+    const body = {
+      summary: req.body.title,
+      location: req.body.location || undefined,
+      start: { dateTime: req.body.start, timeZone: process.env.TZ || 'Europe/Vienna' },
+      end: { dateTime: req.body.end, timeZone: process.env.TZ || 'Europe/Vienna' }
+    };
+    const data = await googleRequest('/calendars/primary/events', { method: 'POST', body: JSON.stringify(body) });
+    res.status(201).json(mapCalendarEvent(data));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.get('/api/life/trello/boards', auth, async (_req, res) => {
+  try {
+    const boards = await trelloRequest('/members/me/boards', { fields: 'name,url', lists: 'open' });
+    res.json(boards.map((board) => ({ id: board.id, name: board.name, url: board.url, lists: board.lists || [] })));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.get('/api/life/trello/tasks', auth, async (req, res) => {
+  try {
+    const boardId = String(req.query.boardId || '');
+    if (!boardId) return res.json([]);
+    const lists = await trelloRequest(`/boards/${boardId}/lists`, { cards: 'open', card_fields: 'name,due,url,idList' });
+    res.json(lists.map((list) => ({
+      id: list.id,
+      name: list.name,
+      cards: (list.cards || []).map((card) => ({ id: card.id, name: card.name, due: card.due, url: card.url, listId: card.idList }))
+    })));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.put('/api/life/trello/cards/:id/move', auth, async (req, res) => {
+  try {
+    const { key, token } = trelloCredentials();
+    if (!key || !token) return res.status(400).json({ error: 'Trello is not configured' });
+    const url = new URL(`https://api.trello.com/1/cards/${req.params.id}`);
+    url.searchParams.set('key', key);
+    url.searchParams.set('token', token);
+    url.searchParams.set('idList', req.body.listId);
+    const response = await fetch(url, { method: 'PUT' });
+    if (!response.ok) throw new Error(await response.text());
+    res.json(await response.json());
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.post('/api/life/assistant', auth, async (req, res) => {
+  try {
+    const messages = Array.isArray(req.body.messages) ? req.body.messages.slice(-12) : [];
+    const assistantInput = messages.map((message) => ({ role: message.role === 'assistant' ? 'assistant' : 'user', content: String(message.content || '') }));
+
+    if (!process.env.OPENAI_API_KEY && process.env.DEEPSEEK_API_KEY) {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: 'Du bist ein knapper, hilfreicher persoenlicher Life-Dashboard-Assistent. Antworte auf Deutsch, praktisch und direkt.' },
+            ...assistantInput
+          ]
+        })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      return res.json({ message: data.choices?.[0]?.message?.content || 'Keine Antwort erhalten.' });
+    }
+
+    if (!process.env.OPENAI_API_KEY) return res.status(400).json({ error: 'OPENAI_API_KEY oder DEEPSEEK_API_KEY fehlt' });
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-5.2',
+        instructions: 'Du bist ein knapper, hilfreicher persoenlicher Life-Dashboard-Assistent. Antworte auf Deutsch, praktisch und direkt.',
+        input: assistantInput
+      })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    const text = data.output_text || data.output?.flatMap((item) => item.content || []).map((part) => part.text || '').join('\n').trim();
+    res.json({ message: text || 'Keine Antwort erhalten.' });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
 
 app.get('/api/backups', auth, (_req, res) => {
   const dbPath = sqlitePath();

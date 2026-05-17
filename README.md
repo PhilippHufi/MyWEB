@@ -1,4 +1,55 @@
-# Personal Dashboard
+# MyWEB Life Dashboard
+
+Modernes privates Life-Dashboard mit React, Vite, TailwindCSS, Express, Prisma/SQLite und Railway Deployment.
+
+## Features
+
+- Wetter via OpenWeatherMap mit Auto-Refresh-fähigem Backend-Proxy
+- Google Calendar OAuth, Terminliste und Termin-Erstellung
+- Trello Boards, Listen und offene Tasks
+- Musik-Suche und Player via Audius oder Jamendo
+- Film-Suche via TMDB
+- Tageszitat via Quotable
+- Zufallswitz via Official Joke API
+- KI-Assistent über OpenAI Responses API
+- Optionaler KI-Assistent-Fallback über DeepSeek-kompatible Chat API
+- Dark Mode, Glassmorphism/Cyberpunk UI, Framer Motion Animationen
+- Verschiebbare Widgets mit lokaler Speicherung
+
+## Setup
+
+```bash
+npm install
+npm install --prefix backend
+npm install --prefix frontend
+cp backend/.env.example backend/.env
+```
+
+Trage deine echten Keys in `backend/.env` ein. Sensible Keys gehören nicht ins Frontend und nicht ins Repository.
+
+## Entwicklung
+
+```bash
+npm run dev
+```
+
+## Produktion
+
+```bash
+npm run build --prefix frontend
+npm run start:prod --prefix backend
+```
+
+Für Railway:
+
+- Volume auf `/data` mounten
+- `DATABASE_URL=file:/data/prod.db`
+- `APP_BASE_URL=https://deine-domain`
+- alle API-Keys als Railway Variables setzen
+
+## Projektgedächtnis
+
+Wichtige Hosting- und Wiederaufbau-Infos stehen in `PROJECT_MEMORY.md`.
 
 Full-stack private dashboard with React, Tailwind CSS, Express, Prisma and SQLite.
 
