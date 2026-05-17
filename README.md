@@ -47,6 +47,26 @@ Für Railway:
 - `APP_BASE_URL=https://deine-domain`
 - alle API-Keys als Railway Variables setzen
 
+## Receipt Scanner / Rechnungen
+
+Der Rechnungsbereich nutzt jetzt Browser-OCR mit Tesseract.js und speichert gescannte Rechnungen ueber einen Cloudflare Worker in Cloudflare KV. Das Foto wird als Data-URL zusammen mit Datum, Betrag, Rohtext und Zeitstempel gespeichert, damit es spaeter wieder in der Webseite geoeffnet werden kann.
+
+Cloudflare Worker einrichten:
+
+```bash
+cd cloudflare-worker
+npx wrangler kv namespace create INVOICES
+npx wrangler kv namespace create INVOICES --preview
+```
+
+Die beiden IDs in `cloudflare-worker/wrangler.toml` eintragen und deployen:
+
+```bash
+npx wrangler deploy
+```
+
+Danach die Worker-URL im Frontend als `VITE_INVOICE_API_URL` setzen oder direkt im Rechnungsbereich der Webseite speichern.
+
 ## Projektgedächtnis
 
 Wichtige Hosting- und Wiederaufbau-Infos stehen in `PROJECT_MEMORY.md`.

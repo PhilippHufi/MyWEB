@@ -44,6 +44,7 @@ Diese Variablen muessen fuer den vollen Funktionsumfang gesetzt sein:
 - `TRELLO_TOKEN`
 - `JAMENDO_CLIENT_ID`
 - `APP_BASE_URL`
+- `VITE_INVOICE_API_URL` (Frontend-URL des Cloudflare Receipt Worker)
 
 ## Chronik
 
@@ -56,6 +57,7 @@ Diese Variablen muessen fuer den vollen Funktionsumfang gesetzt sein:
 - Das neue Life-Dashboard wird modular aufgebaut mit `components/`, `widgets/`, `services/`, `hooks/`, `pages/` und `styles/`.
 - Wichtige Produktregel: Bestehende Bereiche und Funktionen der alten Webseite duerfen nicht geloescht oder ersetzt werden, ohne Philipp vorher klar zu fragen. Neue Funktionen werden bevorzugt ergaenzt oder behutsam in bestehende Bereiche integriert.
 - Nach dem Life-Dashboard-Umbau wurde die alte Webseite wiederhergestellt und der neue Bereich als eigener Navigationspunkt `Life` integriert.
+- Der Rechnungsbereich wurde bewusst ersetzt: neue Rechnungen laufen ueber Browser-OCR mit Tesseract.js und einen Cloudflare Worker in `cloudflare-worker/`. Die Rechnung enthaelt `id`, `date`, `total`, `rawText`, `createdAt` sowie das Foto als `imageData`, damit es in der Webseite wieder geoeffnet werden kann.
 
 ## Wiederaufbau
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import Tesseract from 'tesseract.js';
 import {
   CalendarDays,
   CheckSquare,
@@ -569,103 +570,224 @@ function Shopping({ api }) {
   );
 }
 
-function Invoices({ api }) {
+function Invoices() {
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
   const [file, setFile] = useState(null);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [result, setResult] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [endpoint, setEndpoint] = useState(() => (
+    import.meta.env.VITE_INVOICE_API_URL || localStorage.getItem('pd:invoice-api-url') || ''
+  ));
+
+  const normalizedEndpoint = endpoint.replace(/\/$/, '');
 
   async function load() {
-    setItems(await api.request('invoices'));
+    if (!normalizedEndpoint) {
+      setItems([]);
+      return;
+    }
+    const response = await fetch(normalizedEndpoint + '/invoices');
+    if (!response.ok) throw new Error(await response.text());
+    setItems(await response.json());
   }
 
   useEffect(() => {
     load().catch(() => {});
-  }, []);
+  }, [normalizedEndpoint]);
 
-  async function uploadInvoice(event) {
+  function saveEndpoint(value) {
+    const clean = value.trim().replace(/\/$/, '');
+    if (clean) localStorage.setItem('pd:invoice-api-url', clean);
+    else localStorage.removeItem('pd:invoice-api-url');
+    setEndpoint(clean);
+  }
+
+  async function scanInvoice(event) {
     event.preventDefault();
-    if (!file) return;
-    const body = new FormData();
-    Object.entries(form).forEach(([key, value]) => body.append(key, value));
-    body.append('file', file);
-    const response = await fetch(`${API}/invoices`, {
-      method: 'POST',
-      headers: api.token ? { Authorization: `Bearer ${api.token}` } : {},
-      body
-    });
-    if (!response.ok) throw new Error(await response.text());
-    setFile(null);
-    setForm({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
-    await load();
-  }
+    if (!file || !normalizedEndpoint) return;
 
-  async function downloadFile(path, name) {
-    const response = await fetch(`${API}/${path}`, { headers: api.token ? { Authorization: `Bearer ${api.token}` } : {} });
-    if (!response.ok) throw new Error(await response.text());
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
+    setError('');
+    setStatus('OCR l\u00e4uft...');
+    setOcrProgress(0);
+    setResult(null);
 
-  async function removeInvoice(item) {
-    if (!window.confirm(`Rechnung von ${item.merchant} wirklich loeschen?`)) return;
-    await api.request(`invoices/${item.id}`, { method: 'DELETE' });
-    await load();
-  }
+    try {
+      const imageData = await fileToDataUrl(file);
+      const ocr = await Tesseract.recognize(imageData, 'deu+eng', {
+        logger: (message) => {
+          if (message.status === 'recognizing text') {
+            setOcrProgress(Math.round(message.progress * 100));
+          }
+        }
+      });
 
-  const grouped = items.reduce((acc, item) => {
-    acc[item.month] ||= [];
-    acc[item.month].push(item);
-    return acc;
-  }, {});
+      const rawText = ocr.data.text || '';
+      const invoice = {
+        id: crypto.randomUUID(),
+        date: extractInvoiceDate(rawText),
+        total: extractInvoiceTotal(rawText),
+        rawText,
+        imageData,
+        imageName: file.name,
+        imageType: file.type || 'image/jpeg',
+        createdAt: new Date().toISOString()
+      };
+
+      setResult(invoice);
+      setStatus('Speichere Rechnung...');
+
+      const response = await fetch(normalizedEndpoint + '/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoice)
+      });
+      if (!response.ok) throw new Error(await response.text());
+
+      setFile(null);
+      setStatus('Rechnung gespeichert');
+      setOcrProgress(100);
+      await load();
+    } catch (err) {
+      setStatus('');
+      setError(err.message || 'Rechnung konnte nicht verarbeitet werden.');
+    }
+  }
 
   return (
     <div className="space-y-4">
       <Card>
-        <h2 className="mb-3 text-lg font-semibold">Rechnung speichern</h2>
-        <form onSubmit={uploadInvoice} className="grid gap-3 md:grid-cols-2">
-          <TextInput value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} placeholder="Geschaeft / Firma" />
-          <TextInput value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Kategorie" />
-          <TextInput value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} type="number" step="0.01" placeholder="Betrag" />
-          <TextInput value={form.invoiceDate} onChange={(e) => setForm({ ...form, invoiceDate: e.target.value })} type="date" />
-          <TextInput value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notiz" />
-          <input className="input" type="file" accept="image/*,application/pdf" capture="environment" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          <Button className="md:col-span-2" disabled={!file}><Plus className="h-4 w-4" />Speichern</Button>
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Receipt Scanner</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Foto aufnehmen, OCR im Browser ausfuehren und die Rechnung in Cloudflare KV speichern.
+            </p>
+          </div>
+          <Button type="button" onClick={() => load().catch((err) => setError(err.message))}>Aktualisieren</Button>
+        </div>
+
+        <InvoiceEndpointSetup value={endpoint} onSave={saveEndpoint} />
+
+        <form onSubmit={scanInvoice} className="mt-4 grid gap-3">
+          <input
+            className="input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
+          <Button disabled={!file || !normalizedEndpoint}>
+            <ReceiptText className="h-4 w-4" />Rechnung scannen und speichern
+          </Button>
         </form>
+
+        {(status || error) && (
+          <div className="mt-4 rounded-md border border-white/10 bg-zinc-950/40 p-3 text-sm">
+            {status && <div className="font-medium text-cyan-200">{status}</div>}
+            {status === 'OCR l\u00e4uft...' && (
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: ocrProgress + '%' }} />
+              </div>
+            )}
+            {error && <div className="text-red-300">{error}</div>}
+          </div>
+        )}
+
+        {result && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-semibold text-zinc-300">Erkanntes JSON</h3>
+            <pre className="max-h-80 overflow-auto rounded-md bg-black/60 p-3 text-xs text-cyan-100">
+              {JSON.stringify(stripLargeInvoiceImage(result), null, 2)}
+            </pre>
+          </div>
+        )}
       </Card>
-      <div className="space-y-4">
-        {Object.entries(grouped).map(([month, invoices]) => (
-          <Card key={month}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="font-semibold">{new Date(`${month}-01T00:00:00`).toLocaleDateString('de-AT', { month: 'long', year: 'numeric' })}</h3>
-              <Button type="button" onClick={() => downloadFile(`invoices/month/${month}/download`, `rechnungen-${month}.zip`)}><Download className="h-4 w-4" />Monat downloaden</Button>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-semibold">Gespeicherte Rechnungen</h3>
+          <span className="text-xs text-zinc-500">{items.length} Eintraege</span>
+        </div>
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={item.id} className="flex flex-col gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="font-medium">{item.date || 'Datum unbekannt'}{item.total ? ' - ' + item.total : ''}</div>
+                <div className="text-zinc-500">{new Date(item.createdAt).toLocaleString('de-AT')}{item.imageName ? ' - ' + item.imageName : ''}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {item.imageData && <Button type="button" onClick={() => setSelectedImage(item.imageData)}>Bild oeffnen</Button>}
+                <Button type="button" onClick={() => setResult(item)}>JSON</Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              {invoices.map((item) => (
-                <div key={item.id} className="flex flex-col gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="font-medium">{item.merchant}</div>
-                    <div className="text-zinc-500">
-                      {new Date(item.invoiceDate).toLocaleDateString('de-AT')}{item.amount != null ? ` - ${item.amount.toFixed(2)} EUR` : ''}{item.category ? ` - ${item.category}` : ''}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button type="button" className="icon-btn" onClick={() => downloadFile(`invoices/${item.id}/download`, item.originalName)} aria-label="Download"><Download className="h-4 w-4" /></button>
-                    <button type="button" className="icon-btn" onClick={() => removeInvoice(item)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ))}
-        {!items.length && <Card><p className="text-sm text-zinc-500">Noch keine Rechnungen gespeichert.</p></Card>}
+          ))}
+          {!items.length && <p className="text-sm text-zinc-500">Noch keine gescannten Rechnungen gespeichert.</p>}
+        </div>
+      </Card>
+
+      {selectedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setSelectedImage(null)}>
+          <img src={selectedImage} alt="Gespeicherte Rechnung" className="max-h-full max-w-full rounded-md object-contain shadow-2xl" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvoiceEndpointSetup({ value, onSave }) {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <div className="rounded-md border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+      <div className="font-medium">Cloudflare Worker Endpoint</div>
+      <p className="mt-1 text-amber-100/80">
+        Trage hier die Worker-URL ein oder setze VITE_INVOICE_API_URL im Hosting. Ohne Endpoint kann nichts gespeichert werden.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 md:flex-row">
+        <TextInput value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="https://myweb-receipt-scanner.dein-name.workers.dev" />
+        <Button type="button" onClick={() => onSave(draft)}>Speichern</Button>
       </div>
     </div>
   );
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function extractInvoiceDate(text) {
+  const match = text.match(/\b(\d{1,2}[./]\d{1,2}[./]\d{2,4})\b/);
+  return match ? match[1] : null;
+}
+
+function extractInvoiceTotal(text) {
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const preferredLine = [...lines].reverse().find((line) => /(summe|gesamt|total|betrag|brutto|zu zahlen)/i.test(line));
+  const pattern = /(?:\u20ac\s*)?(\d{1,5}(?:[.,]\d{2}))\s*(?:\u20ac|EUR)?/gi;
+  const primaryMatches = [...(preferredLine || '').matchAll(pattern)].map((match) => match[0].trim());
+  if (primaryMatches.length) return primaryMatches.at(-1);
+  const allMatches = [...text.matchAll(pattern)].map((match) => match[0].trim());
+  return allMatches.at(-1) || null;
+}
+
+function stripLargeInvoiceImage(invoice) {
+  if (!invoice?.imageData) return invoice;
+  return {
+    ...invoice,
+    imageData: '[image data: ' + Math.round(invoice.imageData.length / 1024) + ' KB]'
+  };
 }
 
 function Media({ api }) {
