@@ -1,5 +1,5 @@
 import { Kanban, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DndContext, closestCenter, useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../services/api';

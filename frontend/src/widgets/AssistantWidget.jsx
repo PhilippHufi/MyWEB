@@ -1,5 +1,5 @@
 import { Bot, Send, X } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../services/api';
 import { useLocalStorage } from '../hooks/useLocalStorage';

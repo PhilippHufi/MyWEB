@@ -923,14 +923,18 @@ app.get('/api/life/weather', auth, async (req, res) => {
       status: data.weather?.[0]?.description || 'Unbekannt',
       humidity: data.main?.humidity,
       wind: data.wind?.speed,
-      sunrise: data.sys?.sunrise ? new Date(data.sys.sunrise * 1000).toISOString() : null,
-      sunset: data.sys?.sunset ? new Date(data.sys.sunset * 1000).toISOString() : null,
+      sunrise: data.sys?.sunrise ? localTimeFromUnix(data.sys.sunrise, data.timezone) : null,
+      sunset: data.sys?.sunset ? localTimeFromUnix(data.sys.sunset, data.timezone) : null,
       icon: data.weather?.[0]?.icon || null
     });
   } catch (error) {
     res.status(502).json({ error: error.message });
   }
 });
+
+function localTimeFromUnix(value, timezoneOffset = 0) {
+  return new Date((Number(value) + Number(timezoneOffset || 0)) * 1000).toISOString().slice(11, 16);
+}
 
 app.get('/api/life/quote', auth, async (_req, res) => {
   try {

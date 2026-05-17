@@ -1,5 +1,5 @@
 import { CalendarDays, Plus, RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { api } from '../services/api';
 import { useAsync } from '../hooks/useAsync';
 import { WidgetShell } from '../components/WidgetShell';

@@ -8,7 +8,7 @@ export class ApiError extends Error {
 }
 
 export async function request(path, options = {}) {
-  const token = localStorage.getItem('life:token');
+  const token = localStorage.getItem('life:token') || localStorage.getItem('pd:token');
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {

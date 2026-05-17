@@ -1,3 +1,4 @@
+import React from 'react';
 import { Quote, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { useAsync } from '../hooks/useAsync';

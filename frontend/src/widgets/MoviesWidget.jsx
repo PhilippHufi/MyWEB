@@ -1,5 +1,5 @@
 import { Film, Search } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { request } from '../services/api';
 import { WidgetShell } from '../components/WidgetShell';
 import { Button } from '../components/Button';

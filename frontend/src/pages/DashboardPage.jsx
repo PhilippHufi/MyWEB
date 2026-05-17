@@ -2,7 +2,7 @@ import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LogOut, Moon } from 'lucide-react';
-import { cloneElement } from 'react';
+import React, { cloneElement } from 'react';
 import { WeatherWidget } from '../widgets/WeatherWidget';
 import { CalendarWidget } from '../widgets/CalendarWidget';
 import { TrelloWidget } from '../widgets/TrelloWidget';

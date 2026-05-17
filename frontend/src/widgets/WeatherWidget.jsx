@@ -1,5 +1,5 @@
 import { CloudSun, Droplets, RefreshCw, Sunrise, Sunset, Wind } from 'lucide-react';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { api } from '../services/api';
 import { useAsync } from '../hooks/useAsync';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -51,5 +51,5 @@ function Metric({ icon: Icon, label, value }) {
 }
 
 function time(value) {
-  return value ? new Date(value).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) : '-';
+  return value || '-';
 }

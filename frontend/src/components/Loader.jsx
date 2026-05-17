@@ -1,3 +1,4 @@
+import React from 'react';
 export function Loader({ label = 'Lade Daten...' }) {
   return (
     <div className="flex min-h-24 items-center justify-center gap-3 text-sm text-slate-300">
