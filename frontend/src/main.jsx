@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Tesseract from 'tesseract.js';
 import {
+  BookOpen,
   CalendarDays,
   CheckSquare,
   CloudSun,
@@ -44,6 +45,7 @@ const nav = [
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
   { id: 'stocks', label: 'Aktien', icon: TrendingUp },
+  { id: 'books', label: 'Buecher', icon: BookOpen },
   { id: 'life', label: 'Life', icon: Sparkles },
   { id: 'settings', label: 'Einstellungen', icon: Settings }
 ];
@@ -1550,6 +1552,67 @@ function List({ items, remove, render }) {
   );
 }
 
+function BooksPage() {
+  const books = [
+    {
+      id: 'scalping-preview',
+      title: 'Scalping lernen: vom Chart-Chaos zum Entscheidungsbaum',
+      subtitle: 'Preview-Entwurf aus transkribiertem Videomaterial',
+      htmlUrl: '/books/scalping-preview-book.html',
+      pdfUrl: '/books/scalping-preview-book.pdf'
+    }
+  ];
+  const [activeBook, setActiveBook] = useState(books[0]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Buecher</h2>
+            <p className="mt-1 text-sm text-zinc-500">Deine privaten HTML-Buecher direkt in der Webseite lesen.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => window.open(activeBook.htmlUrl, '_blank', 'noopener,noreferrer')}>
+              <BookOpen className="h-4 w-4" />Separat oeffnen
+            </Button>
+            <Button type="button" className="bg-zinc-700" onClick={() => window.open(activeBook.pdfUrl, '_blank', 'noopener,noreferrer')}>
+              <Download className="h-4 w-4" />PDF
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <Card>
+          <h3 className="mb-3 font-semibold">Bibliothek</h3>
+          <div className="space-y-2">
+            {books.map((book) => (
+              <button
+                key={book.id}
+                type="button"
+                onClick={() => setActiveBook(book)}
+                className={`w-full rounded-md p-3 text-left text-sm transition ${activeBook.id === book.id ? 'bg-ink text-white dark:bg-white dark:text-ink' : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700'}`}
+              >
+                <span className="block font-medium">{book.title}</span>
+                <span className="mt-1 block text-xs opacity-70">{book.subtitle}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden p-0">
+          <iframe
+            title={activeBook.title}
+            src={activeBook.htmlUrl}
+            className="h-[78vh] min-h-[640px] w-full border-0 bg-white"
+          />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPage({ api }) {
   const [users, setUsers] = useState([]);
   const [loginEvents, setLoginEvents] = useState([]);
@@ -1723,6 +1786,7 @@ function App() {
     news: <News api={api} />,
     travel: <Travel api={api} />,
     stocks: <Stocks api={api} />,
+    books: <BooksPage />,
     life: <LifeHub />,
     settings: <SettingsPage api={api} />
   };
