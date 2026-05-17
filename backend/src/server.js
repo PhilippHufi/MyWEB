@@ -900,6 +900,28 @@ async function trelloRequest(pathname, params = {}) {
   return response.json();
 }
 
+async function trelloWrite(method, pathname, params = {}) {
+  const { key, token } = trelloCredentials();
+  if (!key || !token) {
+    const error = new Error('Trello is not configured');
+    error.status = 400;
+    throw error;
+  }
+  const url = new URL(`https://api.trello.com/1${pathname}`);
+  url.searchParams.set('key', key);
+  url.searchParams.set('token', token);
+  for (const [name, value] of Object.entries(params)) {
+    if (value != null && value !== '') url.searchParams.set(name, value);
+  }
+  const response = await fetch(url, { method });
+  if (!response.ok) {
+    const error = new Error(await response.text());
+    error.status = response.status;
+    throw error;
+  }
+  return response.status === 204 ? null : response.json();
+}
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.get('/api/life/weather', auth, async (req, res) => {
@@ -1088,6 +1110,17 @@ app.get('/api/life/trello/boards', auth, async (_req, res) => {
   }
 });
 
+app.post('/api/life/trello/boards', auth, async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Missing board name' });
+    const board = await trelloWrite('POST', '/boards', { name, defaultLists: 'false' });
+    res.status(201).json({ id: board.id, name: board.name, url: board.url });
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
 app.get('/api/life/trello/tasks', auth, async (req, res) => {
   try {
     const boardId = String(req.query.boardId || '');
@@ -1103,19 +1136,61 @@ app.get('/api/life/trello/tasks', auth, async (req, res) => {
   }
 });
 
+app.post('/api/life/trello/lists', auth, async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const idBoard = String(req.body.boardId || '').trim();
+    if (!name || !idBoard) return res.status(400).json({ error: 'Missing list name or board' });
+    const list = await trelloWrite('POST', '/lists', { name, idBoard });
+    res.status(201).json({ id: list.id, name: list.name });
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.post('/api/life/trello/cards', auth, async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const idList = String(req.body.listId || '').trim();
+    if (!name || !idList) return res.status(400).json({ error: 'Missing card name or list' });
+    const card = await trelloWrite('POST', '/cards', {
+      name,
+      idList,
+      desc: req.body.description || '',
+      due: req.body.due || ''
+    });
+    res.status(201).json({ id: card.id, name: card.name, due: card.due, url: card.url, listId: card.idList });
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
 app.put('/api/life/trello/cards/:id/move', auth, async (req, res) => {
   try {
-    const { key, token } = trelloCredentials();
-    if (!key || !token) return res.status(400).json({ error: 'Trello is not configured' });
-    const url = new URL(`https://api.trello.com/1/cards/${req.params.id}`);
-    url.searchParams.set('key', key);
-    url.searchParams.set('token', token);
-    url.searchParams.set('idList', req.body.listId);
-    const response = await fetch(url, { method: 'PUT' });
-    if (!response.ok) throw new Error(await response.text());
-    res.json(await response.json());
+    res.json(await trelloWrite('PUT', `/cards/${req.params.id}`, { idList: req.body.listId }));
   } catch (error) {
     res.status(502).json({ error: error.message });
+  }
+});
+
+app.put('/api/life/trello/cards/:id', auth, async (req, res) => {
+  try {
+    res.json(await trelloWrite('PUT', `/cards/${req.params.id}`, {
+      name: req.body.name,
+      desc: req.body.description,
+      due: req.body.due
+    }));
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
+  }
+});
+
+app.delete('/api/life/trello/cards/:id', auth, async (req, res) => {
+  try {
+    await trelloWrite('PUT', `/cards/${req.params.id}`, { closed: 'true' });
+    res.status(204).end();
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.message });
   }
 });
 

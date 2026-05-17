@@ -53,11 +53,28 @@ export const api = {
     body: JSON.stringify(event)
   }),
   trelloBoards: () => request('/life/trello/boards'),
+  createTrelloBoard: (name) => request('/life/trello/boards', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  }),
   trelloTasks: (boardId) => request(`/life/trello/tasks?boardId=${boardId}`),
+  createTrelloList: (boardId, name) => request('/life/trello/lists', {
+    method: 'POST',
+    body: JSON.stringify({ boardId, name })
+  }),
+  createTrelloCard: (listId, card) => request('/life/trello/cards', {
+    method: 'POST',
+    body: JSON.stringify({ listId, ...card })
+  }),
   moveTrelloCard: (cardId, listId) => request(`/life/trello/cards/${cardId}/move`, {
     method: 'PUT',
     body: JSON.stringify({ listId })
   }),
+  updateTrelloCard: (cardId, patch) => request(`/life/trello/cards/${cardId}`, {
+    method: 'PUT',
+    body: JSON.stringify(patch)
+  }),
+  archiveTrelloCard: (cardId) => request(`/life/trello/cards/${cardId}`, { method: 'DELETE' }),
   assistant: (messages) => request('/life/assistant', {
     method: 'POST',
     body: JSON.stringify({ messages })

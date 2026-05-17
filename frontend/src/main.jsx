@@ -38,8 +38,6 @@ const API = import.meta.env.VITE_API_URL || '/api';
 const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'tasks', label: 'To-do', icon: CheckSquare },
-  { id: 'shopping', label: 'Shopping', icon: ShoppingCart },
-  { id: 'gifts', label: 'Geschenke', icon: Gift },
   { id: 'invoices', label: 'Rechnungen', icon: ReceiptText },
   { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
@@ -104,7 +102,7 @@ function setLocal(key, value) {
   localStorage.setItem(`pd:${key}`, JSON.stringify(value));
 }
 
-function useApi(token) {
+function useApi(token, onUnauthorized) {
   return useMemo(() => {
     async function request(path, options = {}) {
       const response = await fetch(`${API}/${path}`, {
@@ -115,12 +113,18 @@ function useApi(token) {
           ...options.headers
         }
       });
+      if (response.status === 401) {
+        localStorage.removeItem('pd:token');
+        localStorage.removeItem('life:token');
+        onUnauthorized?.();
+        throw new Error('Deine Sitzung ist abgelaufen. Bitte neu einloggen.');
+      }
       if (!response.ok) throw new Error(await response.text());
       if (response.status === 204) return null;
       return response.json();
     }
     return { request, token };
-  }, [token]);
+  }, [token, onUnauthorized]);
 }
 
 function Card({ children, className = '' }) {
@@ -140,8 +144,8 @@ function Button({ children, className = '', ...props }) {
 }
 
 function Login({ onLogin }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('dashboard123');
+  const [username, setUsername] = useState('Philipp');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   async function submit(event) {
@@ -188,6 +192,8 @@ function useCollection(api, name) {
       setLocal(name, data);
       setOffline(false);
     } catch {
+      setMediaError('Filmsuche gerade nicht erreichbar. Ein manueller Eintrag wurde vorbereitet.');
+      setMediaError('Filmsuche gerade nicht erreichbar. Ein manueller Eintrag wurde vorbereitet.');
       setOffline(true);
     }
   }
@@ -665,7 +671,7 @@ function Invoices({ api }) {
 function Media({ api }) {
   const favs = useCollection(api, 'media/favorites');
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState('search');
+  const [tab, setTab] = useState('top');
   const [genre, setGenre] = useState('Alle');
   const [actor, setActor] = useState('');
   const [audience, setAudience] = useState('Alle');
@@ -677,6 +683,8 @@ function Media({ api }) {
   const [topMovies, setTopMovies] = useState([]);
   const [futureMovies, setFutureMovies] = useState([]);
   const [results, setResults] = useState([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaError, setMediaError] = useState('');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [trash, setTrash] = useState(() => JSON.parse(localStorage.getItem('pd:media-trash') || '[]'));
   const tmdbGenres = [
@@ -720,11 +728,19 @@ function Media({ api }) {
 
   async function search(event) {
     event.preventDefault();
+    if (!query.trim()) {
+      setMediaError('Gib einen Filmtitel oder Schauspieler ein.');
+      return;
+    }
+    setMediaLoading(true);
+    setMediaError('');
     try {
       setTab('search');
       setResults(await api.request(`media/search?q=${encodeURIComponent(query)}&type=movie`));
     } catch {
       setResults([{ source: 'manual', externalId: `local-${Date.now()}`, mediaType: 'movie', title: query, imageUrl: null, description: 'Suche gerade nicht erreichbar. Du kannst den Eintrag trotzdem speichern.', watched: false, audience: 'Für mich' }]);
+    } finally {
+      setMediaLoading(false);
     }
   }
 
@@ -773,12 +789,18 @@ function Media({ api }) {
       </Card>
       {tab === 'search' && (
       <Card className="border-zinc-300">
+        <div className="mb-3">
+          <h2 className="font-semibold">Filmsuche</h2>
+          <p className="text-sm text-zinc-500">Suche nach Filmtiteln und speichere Treffer in deinen Favoriten.</p>
+        </div>
         <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_auto]">
           <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Film oder Schauspieler suchen" />
           <Button><Search className="h-4 w-4" />Suchen</Button>
         </form>
       </Card>
       )}
+      {mediaError && <Card><p className="text-sm text-rose-600 dark:text-rose-300">{mediaError}</p></Card>}
+      {mediaLoading && <Card><p className="text-sm text-zinc-500">Filmdaten werden geladen...</p></Card>}
       {tab === 'top' && (
       <Card className="border-zinc-300">
         <div className="grid gap-3 md:grid-cols-5">
@@ -821,6 +843,13 @@ function Media({ api }) {
         </Card>
       )}
       {(tab === 'search' || tab === 'top' || tab === 'future') && (
+      <>
+      {!mediaLoading && (tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).length === 0 && (
+        <Card>
+          <h2 className="font-semibold">{tab === 'search' ? 'Keine Suchtreffer' : 'Keine Filme geladen'}</h2>
+          <p className="mt-1 text-sm text-zinc-500">{tab === 'search' ? 'Starte eine Suche oder wechsle zu Toplisten.' : 'Wenn hier nichts erscheint, nutze die Suche oder pruefe die TMDB API.'}</p>
+        </Card>
+      )}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {(tab === 'search' ? results : tab === 'future' ? futureMovies : topMovies).map((item) => (
           <MediaCard
@@ -834,6 +863,7 @@ function Media({ api }) {
           />
         ))}
       </div>
+      </>
       )}
       {tab === 'favorites' && (
         <>
@@ -1099,6 +1129,7 @@ function Travel({ api }) {
   const [savedTrips, setSavedTrips] = useState([]);
   const [tripTrash, setTripTrash] = useState(() => JSON.parse(localStorage.getItem('pd:trip-trash') || '[]'));
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [drag, setDrag] = useState(null);
 
   function setTripTrashItems(next) {
@@ -1118,6 +1149,7 @@ function Travel({ api }) {
   async function submit(event) {
     event.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const generated = await api.request('generate-trip', {
         method: 'POST',
@@ -1129,6 +1161,8 @@ function Travel({ api }) {
         })
       });
       setPlan(generated);
+    } catch {
+      setError('Reise konnte gerade nicht generiert werden. Bitte pruefe Stadtname und Verbindung.');
     } finally {
       setLoading(false);
     }
@@ -1193,6 +1227,10 @@ function Travel({ api }) {
   return (
     <div className="space-y-5">
       <Card>
+        <div className="mb-3">
+          <h2 className="font-semibold">Reiseplaner</h2>
+          <p className="text-sm text-zinc-500">Stadt, Dauer und Reisetyp waehlen. Danach erstellt die Webseite Tagesplan, Karte, Hotels und Tipps.</p>
+        </div>
         <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_120px_180px_auto]">
           <TextInput value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Stadt, z. B. Barcelona" />
           <TextInput value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} type="number" min="1" max="21" placeholder="Tage" />
@@ -1204,10 +1242,11 @@ function Travel({ api }) {
           <Button disabled={loading}>{loading ? 'Plane...' : 'Reise generieren'}</Button>
         </form>
       </Card>
+      {error && <Card><p className="text-sm text-rose-600 dark:text-rose-300">{error}</p></Card>}
 
-      {!!savedTrips.length && (
-        <Card>
+      <Card>
           <h2 className="mb-3 font-semibold">Gespeicherte Reisen</h2>
+        {!!savedTrips.length ? (
           <div className="space-y-2">
             {savedTrips.map((trip) => (
               <div key={trip.id} className="flex items-center justify-between gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800">
@@ -1216,8 +1255,10 @@ function Travel({ api }) {
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        ) : (
+          <p className="text-sm text-zinc-500">Noch keine gespeicherte Reise. Generiere einen Plan und klicke danach auf "Reise speichern".</p>
+        )}
+      </Card>
 
       {plan && (
         <>
@@ -1542,7 +1583,7 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('pd:token'));
   const [page, setPage] = useState('dashboard');
   const [dark, setDark] = useState(localStorage.getItem('pd:dark') === 'true');
-  const api = useApi(token);
+  const api = useApi(token, () => setToken(null));
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -1554,9 +1595,7 @@ function App() {
 
   const pages = {
     dashboard: <Dashboard api={api} />,
-    tasks: <Tasks api={api} />,
-    shopping: <Shopping api={api} />,
-    gifts: <Gifts api={api} />,
+    tasks: <TrelloWidget title="To-do" intro={false} />,
     invoices: <Invoices api={api} />,
     media: <Media api={api} />,
     news: <News api={api} />,
