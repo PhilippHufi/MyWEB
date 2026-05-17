@@ -12,7 +12,20 @@ export function JokeWidget(props) {
     <WidgetShell title="Witz" icon={Laugh} action={<button className="icon-soft" onClick={run} aria-label="Neuer Witz"><RefreshCw className="h-4 w-4" /></button>} {...props}>
       {loading && <Loader />}
       <ErrorState message={error} />
-      {data && <div className="space-y-4"><p className="text-lg font-semibold text-white">{data.setup}</p><p className="rounded-md bg-fuchsia-400/10 p-3 text-fuchsia-100">{data.punchline}</p></div>}
+      {data && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-lg font-semibold text-white">{data.setup}</p>
+            <p className="mt-2 rounded-md bg-fuchsia-400/10 p-3 text-fuchsia-100">{data.punchline}</p>
+          </div>
+          {data.translation && (
+            <div className="rounded-md bg-cyan-400/10 p-3 text-sm text-cyan-50">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Deutsch</p>
+              <p className="whitespace-pre-line">{data.translation}</p>
+            </div>
+          )}
+        </div>
+      )}
     </WidgetShell>
   );
 }

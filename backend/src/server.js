@@ -26,6 +26,7 @@ const rssParser = new Parser({
 });
 const port = process.env.PORT || 4000;
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+const adminUsername = String(process.env.ADMIN_USERNAME || process.env.DEFAULT_USERNAME || 'Philipp').trim().toLowerCase();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDist = path.resolve(__dirname, '../../frontend/dist');
@@ -52,7 +53,8 @@ app.use(cors());
 app.use(express.json({ limit: '200mb' }));
 
 function signUser(user) {
-  return jwt.sign({ sub: user.id, username: user.email }, jwtSecret, { expiresIn: '24h' });
+  const username = user.email;
+  return jwt.sign({ sub: user.id, username, isAdmin: String(username).trim().toLowerCase() === adminUsername }, jwtSecret, { expiresIn: '24h' });
 }
 
 function auth(req, res, next) {
@@ -65,6 +67,12 @@ function auth(req, res, next) {
   } catch {
     res.status(401).json({ error: 'Invalid token' });
   }
+}
+
+function adminOnly(req, res, next) {
+  const username = String(req.user?.username || '').trim().toLowerCase();
+  if (username !== adminUsername) return res.status(403).json({ error: 'Nur Philipp darf Benutzer verwalten.' });
+  next();
 }
 
 function parseDate(value) {
@@ -972,14 +980,53 @@ app.get('/api/life/quote', auth, async (_req, res) => {
   }
 });
 
+async function translateJokeToGerman(text) {
+  const fallback = localJokeTranslation(text);
+  if (!process.env.OPENAI_API_KEY) return fallback;
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-5.4-mini',
+        input: `Übersetze diesen englischen Witz natürlich und kurz ins Deutsche. Behalte Setup und Pointe in zwei Zeilen, ohne Erklärung:\n${text}`,
+        store: false
+      })
+    });
+    if (!response.ok) throw new Error('OpenAI translation failed');
+    const data = await response.json();
+    const translated = data.output_text || data.output?.flatMap((item) => item.content || []).map((part) => part.text).filter(Boolean).join('\n');
+    return translated?.trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function localJokeTranslation(text) {
+  const normalized = text.toLowerCase();
+  if (normalized.includes('bear') && normalized.includes('teeth')) return 'Wie nennt man einen Bären ohne Zähne?\nGummibärchen.';
+  if (normalized.includes('darth vader') && normalized.includes('christmas')) return 'Woher wusste Darth Vader, was Luke zu Weihnachten bekommt?\nEr hat seine Geschenke gespürt.';
+  if (normalized.includes('programmer') || normalized.includes('computer')) return 'Computerwitz:\nDie Pointe funktioniert auf Deutsch leider nur teilweise, aber der Sinn bleibt erhalten.';
+  return 'Deutsche Übersetzung:\n' + text;
+}
+
 app.get('/api/life/joke', auth, async (_req, res) => {
   try {
     const response = await fetch('https://official-joke-api.appspot.com/random_joke');
     if (!response.ok) throw new Error('Joke request failed');
     const data = await response.json();
-    res.json({ setup: data.setup, punchline: data.punchline });
+    const text = `${data.setup}\n${data.punchline}`;
+    const translated = await translateJokeToGerman(text);
+    res.json({ setup: data.setup, punchline: data.punchline, translation: translated });
   } catch (error) {
-    res.json({ setup: 'Warum mag ein Dashboard gute Backups?', punchline: 'Weil es dann nicht jeden Tag von vorne anfangen muss.' });
+    res.json({
+      setup: 'Warum mag ein Dashboard gute Backups?',
+      punchline: 'Weil es dann nicht jeden Tag von vorne anfangen muss.',
+      translation: 'Warum mag ein Dashboard gute Backups?\nWeil es dann nicht jeden Tag von vorne anfangen muss.'
+    });
   }
 });
 
@@ -1290,7 +1337,7 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ token: signUser(user), user: { id: user.id, username: user.email } });
 });
 
-app.get('/api/users', auth, async (_req, res) => {
+app.get('/api/users', auth, adminOnly, async (_req, res) => {
   const users = await prisma.user.findMany({
     orderBy: { id: 'asc' },
     select: { id: true, email: true, createdAt: true, lastLoginAt: true }
@@ -1298,7 +1345,7 @@ app.get('/api/users', auth, async (_req, res) => {
   res.json(users);
 });
 
-app.get('/api/login-events', auth, async (_req, res) => {
+app.get('/api/login-events', auth, adminOnly, async (_req, res) => {
   const events = await prisma.loginEvent.findMany({
     orderBy: { createdAt: 'desc' },
     take: 10,
@@ -1307,7 +1354,7 @@ app.get('/api/login-events', auth, async (_req, res) => {
   res.json(events);
 });
 
-app.post('/api/users', auth, async (req, res) => {
+app.post('/api/users', auth, adminOnly, async (req, res) => {
   const username = String(req.body.username || req.body.email || '').trim();
   const password = String(req.body.password || '');
   if (!username || password.length < 4) {
@@ -1323,7 +1370,7 @@ app.post('/api/users', auth, async (req, res) => {
   res.status(201).json(user);
 });
 
-app.put('/api/users/:id', auth, async (req, res) => {
+app.put('/api/users/:id', auth, adminOnly, async (req, res) => {
   const data = {};
   const username = String(req.body.username || req.body.email || '').trim();
   const password = String(req.body.password || '');
@@ -1337,7 +1384,7 @@ app.put('/api/users/:id', auth, async (req, res) => {
   res.json(user);
 });
 
-app.delete('/api/users/:id', auth, async (req, res) => {
+app.delete('/api/users/:id', auth, adminOnly, async (req, res) => {
   const id = Number(req.params.id);
   if (id === Number(req.user.sub)) return res.status(400).json({ error: 'Cannot delete current user' });
   await prisma.user.delete({ where: { id } });
@@ -1766,7 +1813,7 @@ app.delete('/api/invoices/:id', auth, async (req, res) => {
 });
 
 app.get('/api/media/search', auth, async (req, res) => {
-  const query = String(req.query.q || '').trim();
+  const query = String(req.query.q || req.query.query || '').trim();
   const type = String(req.query.type || 'movie');
   if (!query) return res.json([]);
 

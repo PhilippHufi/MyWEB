@@ -1,0 +1,26 @@
+{
+  "name": "MyWeb Dashboard",
+  "short_name": "MyWeb",
+  "description": "Philipps private Dashboard-App fuer Alltag, Buchhaltung, Medien, News und Life-Tools.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#202432",
+  "theme_color": "#202432",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

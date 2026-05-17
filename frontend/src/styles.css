@@ -9,6 +9,121 @@
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #151821;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(34, 211, 238, .16), transparent 30rem),
+    radial-gradient(circle at 88% 0%, rgba(244, 63, 94, .12), transparent 28rem),
+    linear-gradient(135deg, #171b26 0%, #202432 48%, #151821 100%);
+}
+
+.sidebar-modern {
+  background: rgba(28, 34, 48, .94) !important;
+  border-right-color: rgba(255, 255, 255, .13) !important;
+  box-shadow: 22px 0 70px rgba(0, 0, 0, .16);
+  backdrop-filter: blur(22px);
+}
+
+.brand-bar {
+  border-radius: .5rem;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .06);
+  padding: .75rem;
+}
+
+.brand-title {
+  color: #ffffff;
+  text-shadow: 0 1px 10px rgba(56, 189, 248, .35);
+  letter-spacing: 0;
+}
+
+.page-title {
+  background: linear-gradient(90deg, #f8fafc, #93c5fd 52%, #f0abfc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-modern {
+  border-color: rgba(255, 255, 255, .16) !important;
+  background: linear-gradient(145deg, rgba(43, 49, 67, .94), rgba(31, 36, 50, .9)) !important;
+  color: #e8edf6;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255, 255, 255, .08);
+  backdrop-filter: blur(18px);
+}
+
+.card-modern .text-zinc-500,
+.card-modern .text-zinc-600,
+.card-modern .dark\:text-zinc-300 {
+  color: #aeb9ca !important;
+}
+
+.card-modern h1,
+.card-modern h2,
+.card-modern h3,
+.card-modern .font-semibold,
+.card-modern .font-medium {
+  color: #f4f7fb;
+}
+
+.card-modern .bg-zinc-100,
+.card-modern .dark\:bg-zinc-800 {
+  background: rgba(17, 24, 39, .34) !important;
+}
+
+.btn-modern {
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: linear-gradient(135deg, #38bdf8, #a78bfa) !important;
+  color: #111827 !important;
+  text-shadow: none;
+  box-shadow: 0 10px 24px rgba(56, 189, 248, .12);
+}
+
+.btn-modern svg {
+  color: #111827;
+}
+
+.btn-modern:hover {
+  filter: brightness(1.08);
+}
+
+.nav-button {
+  color: #c6cfdd;
+  transition: transform .16s ease, background .16s ease, color .16s ease;
+}
+
+.nav-button:hover {
+  transform: translateX(2px);
+  background: rgba(255, 255, 255, .07) !important;
+  color: #f8fafc;
+}
+
+.nav-active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, .95), rgba(167, 139, 250, .95)) !important;
+  color: #101828 !important;
+  box-shadow: 0 12px 28px rgba(56, 189, 248, .16);
+}
+
+.nav-active svg {
+  color: #101828;
+}
+
+.login-screen {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(34, 211, 238, .18), transparent 28rem),
+    radial-gradient(circle at 82% 8%, rgba(244, 63, 94, .14), transparent 30rem),
+    linear-gradient(145deg, #171b26, #232838 55%, #151821);
+  color: #f4f4f5;
+}
+
+.login-card {
+  border-color: rgba(255, 255, 255, .18) !important;
+  background: rgba(38, 43, 59, .9) !important;
+  color: #f4f4f5;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .09);
+  backdrop-filter: blur(22px);
 }
 
 .input {
@@ -23,9 +138,35 @@ body {
 }
 
 .dark .input {
-  border-color: rgb(63 63 70);
-  background: rgb(39 39 42);
-  color: rgb(244 244 245);
+  border-color: rgba(255, 255, 255, .12);
+  background: rgba(23, 30, 44, .92);
+  color: #eef2f8;
+}
+
+.dark .input::placeholder {
+  color: #94a3b8;
+}
+
+select.input {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.dark select.input,
+.card-modern select.input {
+  color: #f8fafc !important;
+  background-color: #1f2937 !important;
+}
+
+select.input option {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.dark select.input option,
+.card-modern select.input option {
+  color: #f8fafc;
+  background-color: #1f2937;
 }
 
 .input:focus {
@@ -48,6 +189,20 @@ body {
 
 .dark .icon-btn:hover {
   background: rgb(39 39 42);
+}
+
+.youtube-btn {
+  border: 1px solid rgba(255, 255, 255, .14) !important;
+  background: linear-gradient(135deg, #ff0033 0%, #cc0000 52%, #8b0000 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(220, 38, 38, .32), inset 0 1px 0 rgba(255, 255, 255, .25);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.youtube-btn:hover {
+  background: linear-gradient(135deg, #ff1744 0%, #e00000 55%, #a00000 100%) !important;
+  transform: translateY(-1px);
 }
 
 .life-modern {

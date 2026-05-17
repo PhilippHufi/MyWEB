@@ -7,7 +7,7 @@ import { Button } from '../components/Button';
 import { ErrorState } from '../components/ErrorState';
 import { Loader } from '../components/Loader';
 
-export function TrelloWidget({ title = 'To-do Board', intro = true }) {
+export function TrelloWidget({ title = 'Aufgaben', intro = true }) {
   const [boards, setBoards] = useState([]);
   const [boardId, setBoardId] = useState('');
   const [lists, setLists] = useState([]);
@@ -105,11 +105,14 @@ export function TrelloWidget({ title = 'To-do Board', intro = true }) {
   }
 
   async function archiveCard(cardId) {
-    if (!window.confirm('Karte wirklich archivieren?')) return;
+    if (!window.confirm('Aufgabe wirklich löschen?')) return;
+    const previousLists = lists;
+    setLists((current) => current.map((list) => ({ ...list, cards: list.cards.filter((card) => card.id !== cardId) })));
     try {
       await api.archiveTrelloCard(cardId);
       await loadTasks();
     } catch (err) {
+      setLists(previousLists);
       setError(readableTrelloError(err.message));
     }
   }
@@ -135,7 +138,7 @@ export function TrelloWidget({ title = 'To-do Board', intro = true }) {
               <Kanban className="h-5 w-5 text-cyan-500" />
               <h2 className="text-xl font-semibold">{title}</h2>
             </div>
-            {intro && <p className="mt-1 text-sm text-zinc-500">Trello-Boards, Listen und Karten direkt in deiner Webseite. Karten kannst du per Drag & Drop zwischen Listen verschieben.</p>}
+            {intro && <p className="mt-1 text-sm text-zinc-500">Bereiche, Listen und Aufgaben direkt in deiner Webseite. Aufgaben kannst du per Drag & Drop zwischen Listen verschieben.</p>}
           </div>
           <Button type="button" onClick={() => loadTasks()} disabled={loading}><RefreshCw className="h-4 w-4" />{loading ? 'Lade...' : 'Aktualisieren'}</Button>
         </div>
@@ -145,31 +148,31 @@ export function TrelloWidget({ title = 'To-do Board', intro = true }) {
 
       <section className="grid gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 xl:grid-cols-[1fr_1fr_auto]">
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Board</label>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Bereich</label>
           <select className="input" value={boardId} onChange={(event) => setBoardId(event.target.value)}>
             {boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
           </select>
         </div>
         <form className="flex items-end gap-2" onSubmit={createBoard}>
           <div className="flex-1">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Neues Board</label>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Neuer Bereich</label>
             <input className="input" value={boardName} onChange={(event) => setBoardName(event.target.value)} placeholder="z.B. Privat, Arbeit, Urlaub" />
           </div>
-          <Button type="submit"><Plus className="h-4 w-4" />Board</Button>
+          <Button type="submit"><Plus className="h-4 w-4" />Bereich</Button>
         </form>
-        {activeBoard?.url && <Button type="button" className="self-end bg-zinc-700" onClick={() => window.open(activeBoard.url, '_blank', 'noopener,noreferrer')}><ExternalLink className="h-4 w-4" />Trello</Button>}
+        {activeBoard?.url && <Button type="button" className="self-end bg-zinc-700" onClick={() => window.open(activeBoard.url, '_blank', 'noopener,noreferrer')}><ExternalLink className="h-4 w-4" />Trello öffnen</Button>}
       </section>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={createList}>
-          <input className="input" value={listName} onChange={(event) => setListName(event.target.value)} placeholder="Neue Liste, z.B. Ideen, To-do, In Arbeit, Erledigt" disabled={!boardId} />
+          <input className="input" value={listName} onChange={(event) => setListName(event.target.value)} placeholder="Neue Liste, z.B. Ideen, Offen, In Arbeit, Erledigt" disabled={!boardId} />
           <Button type="submit" disabled={!boardId}><Plus className="h-4 w-4" />Liste erstellen</Button>
         </form>
       </section>
 
       {loading && <Loader />}
-      {!loading && !boards.length && <EmptyState text="Noch kein Trello-Board gefunden. Erstelle oben ein Board oder pruefe deinen Trello Token." />}
-      {!loading && boardId && !lists.length && <EmptyState text="Dieses Board hat noch keine Listen. Erstelle eine Liste, um Karten anzulegen." />}
+      {!loading && !boards.length && <EmptyState text="Noch kein Aufgabenbereich gefunden. Erstelle oben einen Bereich oder prüfe deinen Trello Token." />}
+      {!loading && boardId && !lists.length && <EmptyState text="Dieser Bereich hat noch keine Listen. Erstelle eine Liste, um Aufgaben anzulegen." />}
 
       <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <div className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-4">
@@ -202,10 +205,10 @@ function TrelloList({ list, draft, setDraft, createCard, updateCard, archiveCard
         {list.cards.map((card) => <TrelloCard key={card.id} card={card} updateCard={updateCard} archiveCard={archiveCard} />)}
       </div>
       <form className="mt-3 space-y-2 rounded-md border border-dashed border-zinc-300 p-2 dark:border-zinc-700" onSubmit={createCard}>
-        <input className="input" value={draft.name || ''} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Neue Karte" />
+        <input className="input" value={draft.name || ''} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Neue Aufgabe" />
         <textarea className="input min-h-20" value={draft.description || ''} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Beschreibung / Unterpunkte" />
         <input className="input" type="date" value={draft.due || ''} onChange={(event) => setDraft({ ...draft, due: event.target.value })} />
-        <Button type="submit" className="w-full"><Plus className="h-4 w-4" />Karte hinzufügen</Button>
+        <Button type="submit" className="w-full"><Plus className="h-4 w-4" />Aufgabe hinzufügen</Button>
       </form>
     </section>
   );
@@ -252,7 +255,7 @@ function TrelloCard({ card, updateCard, archiveCard }) {
       </div>
       <div className="mt-3 flex gap-2">
         <Button type="button" className="h-8 bg-zinc-700 px-2" onClick={() => setEditing(true)}>Bearbeiten</Button>
-        <button type="button" className="icon-btn" onClick={() => archiveCard(card.id)} aria-label="Archivieren"><Trash2 className="h-4 w-4" /></button>
+        <button type="button" className="icon-btn" onClick={() => archiveCard(card.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
       </div>
     </article>
   );
@@ -263,6 +266,6 @@ function EmptyState({ text }) {
 }
 
 function readableTrelloError(message = '') {
-  if (/invalid token|unauthorized|401/i.test(message)) return 'Trello-Zugriff abgelehnt. Bitte TRELLO_API_KEY und TRELLO_TOKEN pruefen.';
+  if (/invalid token|unauthorized|401/i.test(message)) return 'Trello-Zugriff abgelehnt. Bitte TRELLO_API_KEY und TRELLO_TOKEN prüfen.';
   return message || 'Trello konnte gerade nicht geladen werden.';
 }

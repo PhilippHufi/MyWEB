@@ -36,16 +36,26 @@ import { GoogleCallbackPage } from './pages/GoogleCallbackPage';
 import './styles.css';
 
 const API = import.meta.env.VITE_API_URL || '/api';
+const INVOICE_WORKER_URL = import.meta.env.VITE_INVOICE_API_URL || 'https://myweb-receipt-scanner.philipp-myweb.workers.dev';
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
 
 const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'tasks', label: 'To-do', icon: CheckSquare },
-  { id: 'invoices', label: 'Buchhaltung', icon: ReceiptText },
+  { id: 'bookkeeping', label: 'Buchhaltung', icon: ReceiptText, children: [
+    { id: 'invoices', label: 'Rechnungen', icon: ReceiptText },
+    { id: 'offers', label: 'Angebote', icon: ReceiptText }
+  ] },
   { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
   { id: 'stocks', label: 'Aktien', icon: TrendingUp },
-  { id: 'books', label: 'Buecher', icon: BookOpen },
+  { id: 'books', label: 'Bücher', icon: BookOpen },
   { id: 'life', label: 'Life', icon: Sparkles },
   { id: 'settings', label: 'Einstellungen', icon: Settings }
 ];
@@ -61,7 +71,7 @@ const defaults = {
 function fallbackWeather() {
   const today = new Date();
   return {
-    label: 'Linz, Oberoesterreich (Fallback)',
+    label: 'Linz, Oberösterreich (Fallback)',
     source: 'Fallback',
     daily: {
       time: Array.from({ length: 7 }, (_, index) => {
@@ -130,8 +140,18 @@ function useApi(token, onUnauthorized) {
   }, [token, onUnauthorized]);
 }
 
+function decodeTokenPayload(token) {
+  try {
+    const payload = token?.split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+  } catch {
+    return null;
+  }
+}
+
 function Card({ children, className = '' }) {
-  return <section className={`rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${className}`}>{children}</section>;
+  return <section className={`card-modern rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${className}`}>{children}</section>;
 }
 
 function TextInput(props) {
@@ -143,7 +163,7 @@ function Select(props) {
 }
 
 function Button({ children, className = '', ...props }) {
-  return <button {...props} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-ink dark:hover:bg-zinc-200 ${className}`}>{children}</button>;
+  return <button {...props} className={`btn-modern inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-white dark:text-ink dark:hover:bg-zinc-200 ${className}`}>{children}</button>;
 }
 
 function Login({ onLogin }) {
@@ -169,10 +189,11 @@ function Login({ onLogin }) {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-zinc-100 p-4 dark:bg-zinc-950">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 className="text-xl font-semibold">Personal Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">Melde dich lokal an.</p>
+    <main className="login-screen grid min-h-screen place-items-center p-4">
+      <form onSubmit={submit} className="login-card w-full max-w-sm rounded-lg border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">Private Zentrale</p>
+        <h1 className="mt-2 text-2xl font-black">MyWeb</h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-300">Nur angelegte Benutzer koennen sich anmelden. Admin: Philipp.</p>
         <div className="mt-5 space-y-3">
           <TextInput value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Benutzer" />
           <TextInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Passwort" type="password" />
@@ -195,8 +216,6 @@ function useCollection(api, name) {
       setLocal(name, data);
       setOffline(false);
     } catch {
-      setMediaError('Filmsuche gerade nicht erreichbar. Ein manueller Eintrag wurde vorbereitet.');
-      setMediaError('Filmsuche gerade nicht erreichbar. Ein manueller Eintrag wurde vorbereitet.');
       setOffline(true);
     }
   }
@@ -258,7 +277,7 @@ function Dashboard({ api }) {
 
   useEffect(() => {
     api.request('weather').then(setWeather).catch(() => setWeather(fallbackWeather()));
-    api.request('traffic').then(setTraffic).catch(() => setTraffic([{ title: 'A1 Oberoesterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsdaten gerade nicht erreichbar.' }]));
+    api.request('traffic').then(setTraffic).catch(() => setTraffic([{ title: 'A1 Oberösterreich', link: 'https://www.asfinag.at/verkehr-sicherheit/', content: 'Verkehrsdaten gerade nicht erreichbar.' }]));
     api.request('news?scope=at&type=articles&category=all&period=week').then((data) => setLatestNews(data.slice(0, 3))).catch(() => setLatestNews(fallbackNewsItems('at').slice(0, 3)));
   }, []);
 
@@ -298,7 +317,7 @@ function Dashboard({ api }) {
           </div>
         </Card>
         <Card>
-          <h2 className="font-semibold">A1 Oberoesterreich</h2>
+          <h2 className="font-semibold">A1 Oberösterreich</h2>
           <p className="mt-1 text-xs text-zinc-500">Quelle: ASFINAG / Fallback</p>
           <div className="mt-3 space-y-2">
             {traffic.map((item, index) => (
@@ -322,6 +341,10 @@ function Dashboard({ api }) {
           {!latestNews.length && <p className="text-sm text-zinc-500">Keine aktuellen News geladen.</p>}
         </div>
       </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <QuoteWidget />
+        <JokeWidget />
+      </div>
     </div>
   );
 }
@@ -489,7 +512,7 @@ function Gifts({ api }) {
   }, {});
 
   function removeGift(item) {
-    if (window.confirm(`${item.name} fuer ${item.person} wirklich loeschen?`)) {
+    if (window.confirm(`${item.name} für ${item.person} wirklich löschen?`)) {
       remove(item.id);
     }
   }
@@ -572,20 +595,22 @@ function Shopping({ api }) {
   );
 }
 
-function BookkeepingPage() {
+function BookkeepingPage({ initialSection = 'invoice' }) {
   const [items, setItems] = useState([]);
-  const [section, setSection] = useState('invoice');
+  const [section, setSection] = useState(initialSection);
   const [invoiceMode, setInvoiceMode] = useState('ocr');
+  const [showTrash, setShowTrash] = useState(false);
   const [scanFile, setScanFile] = useState(null);
   const [manualFile, setManualFile] = useState(null);
   const [offerFile, setOfferFile] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [processing, setProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [result, setResult] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [endpoint, setEndpoint] = useState(() => (
-    import.meta.env.VITE_INVOICE_API_URL || localStorage.getItem('pd:invoice-api-url') || ''
+    localStorage.getItem('pd:invoice-api-url') || INVOICE_WORKER_URL
   ));
   const [manualForm, setManualForm] = useState({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
   const [offerForm, setOfferForm] = useState({ title: '', partner: '', category: '', amount: '', offerDate: new Date().toISOString().slice(0, 10), validUntil: '', notes: '' });
@@ -596,7 +621,8 @@ function BookkeepingPage() {
     const fromItems = items.map((item) => item.category).filter(Boolean);
     return Array.from(new Set([...base, ...fromItems]));
   }, [items]);
-  const visibleItems = items.filter((item) => (item.recordType || 'invoice') === section);
+  const visibleItems = items.filter((item) => (item.recordType || 'invoice') === section && !item.deletedAt);
+  const trashItems = items.filter((item) => item.deletedAt);
 
   async function load() {
     if (!normalizedEndpoint) {
@@ -611,6 +637,11 @@ function BookkeepingPage() {
   useEffect(() => {
     load().catch(() => {});
   }, [normalizedEndpoint]);
+
+  useEffect(() => {
+    setSection(initialSection);
+    setShowTrash(false);
+  }, [initialSection]);
 
   function saveEndpoint(value) {
     const clean = value.trim().replace(/\/$/, '');
@@ -634,16 +665,20 @@ function BookkeepingPage() {
 
   async function scanInvoice(event) {
     event.preventDefault();
-    if (!scanFile || !normalizedEndpoint) return;
+    if (!scanFile || !normalizedEndpoint || processing) return;
     setError('');
-    setStatus('OCR laeuft...');
+    setProcessing(true);
+    setStatus('Bild wird vorbereitet...');
     setOcrProgress(0);
     setResult(null);
 
     try {
-      const imageData = await fileToDataUrl(scanFile);
-      const ocr = await Tesseract.recognize(imageData, 'deu+eng', {
+      const imageData = await imageToOptimizedDataUrl(scanFile);
+      const ocrImageData = await imageToOcrDataUrl(scanFile);
+      setStatus('OCR startet...');
+      const ocr = await Tesseract.recognize(ocrImageData, 'deu+eng', {
         logger: (message) => {
+          if (message.status) setStatus('OCR: ' + message.status);
           if (message.status === 'recognizing text') setOcrProgress(Math.round(message.progress * 100));
         }
       });
@@ -669,7 +704,9 @@ function BookkeepingPage() {
       setOcrProgress(100);
     } catch (err) {
       setStatus('');
-      setError(err.message || 'Rechnung konnte nicht verarbeitet werden.');
+      setError((err.message || 'Rechnung konnte nicht verarbeitet werden.') + ' Falls das Foto sehr groß ist, fotografiere den Beleg näher und heller.');
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -679,7 +716,7 @@ function BookkeepingPage() {
     setError('');
     setStatus('Speichere manuelle Rechnung...');
     try {
-      const fileData = manualFile ? await fileToDataUrl(manualFile) : '';
+      const fileData = manualFile ? await fileToStoredDataUrl(manualFile) : '';
       const record = {
         id: crypto.randomUUID(),
         recordType: 'invoice',
@@ -712,7 +749,7 @@ function BookkeepingPage() {
     setError('');
     setStatus('Speichere Angebot...');
     try {
-      const fileData = offerFile ? await fileToDataUrl(offerFile) : '';
+      const fileData = offerFile ? await fileToStoredDataUrl(offerFile) : '';
       const record = {
         id: crypto.randomUUID(),
         recordType: 'offer',
@@ -752,8 +789,25 @@ function BookkeepingPage() {
   }
 
   async function removeRecord(item) {
-    if (!window.confirm((item.recordType === 'offer' ? 'Angebot' : 'Rechnung') + ' wirklich loeschen?')) return;
+    if (!window.confirm((item.recordType === 'offer' ? 'Angebot' : 'Rechnung') + ' in den Papierkorb verschieben?')) return;
     const response = await fetch(normalizedEndpoint + '/invoice/' + encodeURIComponent(item.id), { method: 'DELETE' });
+    if (!response.ok) throw new Error(await response.text());
+    await load();
+  }
+
+  async function restoreRecord(item) {
+    const response = await fetch(normalizedEndpoint + '/invoice/' + encodeURIComponent(item.id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deletedAt: null })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    await load();
+  }
+
+  async function hardDeleteRecord(item) {
+    if (!window.confirm('Diesen Eintrag endgültig löschen? Das kann nicht rückgängig gemacht werden.')) return;
+    const response = await fetch(normalizedEndpoint + '/invoice/' + encodeURIComponent(item.id) + '?hard=1', { method: 'DELETE' });
     if (!response.ok) throw new Error(await response.text());
     await load();
   }
@@ -790,16 +844,9 @@ function BookkeepingPage() {
           </div>
         </div>
 
-        <InvoiceEndpointSetup value={endpoint} onSave={saveEndpoint} />
+        {!normalizedEndpoint && <InvoiceEndpointSetup value={endpoint} onSave={saveEndpoint} />}
 
-        <div className="mt-4 grid gap-3 md:grid-cols-[220px_220px_1fr]">
-          <label className="text-sm">
-            <span className="mb-1 block text-zinc-500">Bereich</span>
-            <select className="input" value={section} onChange={(event) => setSection(event.target.value)}>
-              <option value="invoice">Rechnungen</option>
-              <option value="offer">Angebote</option>
-            </select>
-          </label>
+        <div className="mt-4 grid gap-3 md:grid-cols-[220px_1fr]">
           {section === 'invoice' && (
             <label className="text-sm">
               <span className="mb-1 block text-zinc-500">Eingabe</span>
@@ -817,7 +864,7 @@ function BookkeepingPage() {
           <h3 className="mb-3 font-semibold">Rechnung automatisch scannen</h3>
           <form onSubmit={scanInvoice} className="grid gap-3">
             <input className="input" type="file" accept="image/*" capture="environment" onChange={(event) => setScanFile(event.target.files?.[0] || null)} />
-            <Button disabled={!scanFile || !normalizedEndpoint}><ReceiptText className="h-4 w-4" />Rechnung scannen und speichern</Button>
+            <Button disabled={!scanFile || !normalizedEndpoint || processing}><ReceiptText className="h-4 w-4" />{processing ? 'Scanner arbeitet...' : 'Rechnung scannen und speichern'}</Button>
           </form>
         </Card>
       )}
@@ -826,7 +873,7 @@ function BookkeepingPage() {
         <Card>
           <h3 className="mb-3 font-semibold">Rechnung manuell erfassen</h3>
           <form onSubmit={saveManualInvoice} className="grid gap-3 md:grid-cols-2">
-            <TextInput value={manualForm.merchant} onChange={(event) => setManualForm({ ...manualForm, merchant: event.target.value })} placeholder="Geschaeft / Firma" />
+            <TextInput value={manualForm.merchant} onChange={(event) => setManualForm({ ...manualForm, merchant: event.target.value })} placeholder="Geschäft / Firma" />
             <TextInput value={manualForm.category} onChange={(event) => setManualForm({ ...manualForm, category: event.target.value })} placeholder="Kategorie" />
             <TextInput value={manualForm.amount} onChange={(event) => setManualForm({ ...manualForm, amount: event.target.value })} type="number" step="0.01" placeholder="Betrag" />
             <TextInput value={manualForm.invoiceDate} onChange={(event) => setManualForm({ ...manualForm, invoiceDate: event.target.value })} type="date" />
@@ -857,7 +904,7 @@ function BookkeepingPage() {
       {(status || error) && (
         <Card>
           {status && <div className="font-medium text-cyan-300">{status}</div>}
-          {status === 'OCR laeuft...' && <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: ocrProgress + '%' }} /></div>}
+          {status.startsWith('OCR') && <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: ocrProgress + '%' }} /></div>}
           {error && <div className="text-sm text-red-300">{error}</div>}
         </Card>
       )}
@@ -865,7 +912,9 @@ function BookkeepingPage() {
       <Card>
         <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h3 className="font-semibold">{section === 'offer' ? 'Gespeicherte Angebote' : 'Gespeicherte Rechnungen'}</h3>
-          <span className="text-xs text-zinc-500">{visibleItems.length} Eintraege</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-500">{visibleItems.length} Einträge</span>
+          </div>
         </div>
         <div className="space-y-2">
           {visibleItems.map((item) => (
@@ -873,20 +922,21 @@ function BookkeepingPage() {
               <div>
                 <div className="font-medium">{item.title || item.merchant || (item.recordType === 'offer' ? 'Angebot' : 'Rechnung')}</div>
                 <div className="text-zinc-500">{item.date || 'Datum unbekannt'}{item.total ? ' - ' + item.total : ''}{item.merchant ? ' - ' + item.merchant : ''}</div>
-                {item.validUntil && <div className="text-xs text-zinc-500">Gueltig bis: {item.validUntil}</div>}
+                {item.validUntil && <div className="text-xs text-zinc-500">Gültig bis: {item.validUntil}</div>}
+                {item.deletedAt && <div className="text-xs text-amber-300">Gelöscht am: {new Date(item.deletedAt).toLocaleString('de-AT')}</div>}
                 {item.notes && <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{item.notes}</div>}
               </div>
               <select className="input" value={item.category || 'Allgemein'} onChange={(event) => updateCategory(item, event.target.value).catch((err) => setError(err.message))}>
                 {categories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
               <div className="flex flex-wrap gap-2 lg:justify-end">
-                {(item.fileData || item.imageData) && <Button type="button" onClick={() => openStoredFile(item)}>Datei oeffnen</Button>}
+                {(item.fileData || item.imageData) && <Button type="button" onClick={() => openStoredFile(item)}>Datei öffnen</Button>}
                 <Button type="button" className="bg-zinc-700" onClick={() => setResult(item)}>JSON</Button>
-                <button type="button" className="icon-btn" onClick={() => removeRecord(item).catch((err) => setError(err.message))} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" className="icon-btn" onClick={() => removeRecord(item).catch((err) => setError(err.message))} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
-          {!visibleItems.length && <p className="text-sm text-zinc-500">Noch keine Eintraege in diesem Bereich.</p>}
+          {!visibleItems.length && <p className="text-sm text-zinc-500">Noch keine Einträge in diesem Bereich.</p>}
         </div>
       </Card>
 
@@ -896,6 +946,36 @@ function BookkeepingPage() {
           <pre className="max-h-80 overflow-auto rounded-md bg-black/60 p-3 text-xs text-cyan-100">{JSON.stringify(stripLargeBookkeepingFile(result), null, 2)}</pre>
         </Card>
       )}
+
+      <Card>
+        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-semibold">Papierkorb</h3>
+            <p className="text-sm text-zinc-500">Gelöschte Rechnungen und Angebote bleiben hier, bis du sie endgültig löschst.</p>
+          </div>
+          <Button type="button" className="h-8 bg-zinc-700" onClick={() => setShowTrash(!showTrash)}>
+            {showTrash ? 'Einklappen' : `Anzeigen (${trashItems.length})`}
+          </Button>
+        </div>
+        {showTrash && (
+          <div className="space-y-2">
+            {trashItems.map((item) => (
+              <div key={item.id} className="grid gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <div className="font-medium">{item.title || item.merchant || (item.recordType === 'offer' ? 'Angebot' : 'Rechnung')}</div>
+                  <div className="text-zinc-500">{item.recordType === 'offer' ? 'Angebot' : 'Rechnung'}{item.date ? ' - ' + item.date : ''}{item.total ? ' - ' + item.total : ''}</div>
+                  {item.deletedAt && <div className="text-xs text-amber-300">Gelöscht am: {new Date(item.deletedAt).toLocaleString('de-AT')}</div>}
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button type="button" onClick={() => restoreRecord(item).catch((err) => setError(err.message))}>Wiederherstellen</Button>
+                  <button type="button" className="icon-btn" onClick={() => hardDeleteRecord(item).catch((err) => setError(err.message))} aria-label="Endgültig löschen"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ))}
+            {!trashItems.length && <p className="text-sm text-zinc-500">Der Papierkorb ist leer.</p>}
+          </div>
+        )}
+      </Card>
 
       {selectedFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setSelectedFile(null)}>
@@ -931,6 +1011,62 @@ function fileToDataUrl(file) {
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
+  });
+}
+
+async function fileToStoredDataUrl(file) {
+  if (file.type?.startsWith('image/')) return imageToOptimizedDataUrl(file);
+  return fileToDataUrl(file);
+}
+
+async function imageToOptimizedDataUrl(file) {
+  const source = await fileToDataUrl(file);
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    image.onerror = () => reject(new Error('Bild konnte nicht gelesen werden.'));
+    image.src = source;
+  });
+}
+
+async function imageToOcrDataUrl(file) {
+  const source = await fileToDataUrl(file);
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 2200;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      context.drawImage(image, 0, 0, width, height);
+      const pixels = context.getImageData(0, 0, width, height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        const gray = pixels.data[index] * 0.299 + pixels.data[index + 1] * 0.587 + pixels.data[index + 2] * 0.114;
+        const enhanced = gray > 155 ? 255 : gray < 90 ? 0 : Math.min(255, gray * 1.35);
+        pixels.data[index] = enhanced;
+        pixels.data[index + 1] = enhanced;
+        pixels.data[index + 2] = enhanced;
+      }
+      context.putImageData(pixels, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    image.onerror = () => reject(new Error('Bild konnte nicht gelesen werden.'));
+    image.src = source;
   });
 }
 
@@ -996,7 +1132,7 @@ function buildBookkeepingExportHtml(items) {
 <body>
   <header>
     <h1>Buchhaltung Export</h1>
-    <div class="muted">Offline-Datei erstellt am ${escapeHtml(new Date().toLocaleString('de-AT'))}. Enthalten: Rechnungen, Angebote, Kategorien und eingebettete Dateien.</div>
+    <div class="muted">Offline-Datei erstellt am ${escapeHtml(new Date().toLocaleString('de-AT'))}. Enthalten: Rechnungen, Angebote, Kategorien, Papierkorb-Status und eingebettete Dateien.</div>
     <div class="toolbar">
       <select id="type"><option value="all">Alles</option><option value="invoice">Rechnungen</option><option value="offer">Angebote</option></select>
       <input id="search" placeholder="Suchen...">
@@ -1034,13 +1170,14 @@ function buildBookkeepingExportHtml(items) {
           '<div><div><span class="tag">' + esc(recordType) + '</span><span class="tag">' + esc(record.category || 'Allgemein') + '</span></div>' +
           '<h2>' + esc(record.title || record.merchant || recordType) + '</h2>' +
           '<p class="muted">' + esc(record.date || 'Datum unbekannt') + (record.total ? ' - ' + esc(record.total) : '') + (record.merchant ? ' - ' + esc(record.merchant) : '') + '</p>' +
-          (record.validUntil ? '<p class="muted">Gueltig bis: ' + esc(record.validUntil) + '</p>' : '') +
+          (record.validUntil ? '<p class="muted">Gültig bis: ' + esc(record.validUntil) + '</p>' : '') +
+          (record.deletedAt ? '<p class="muted">Gelöscht am: ' + esc(new Date(record.deletedAt).toLocaleString('de-AT')) + '</p>' : '') +
           (record.notes ? '<p>' + esc(record.notes) + '</p>' : '') +
           '</div><div class="actions">' +
-          ((record.fileData || record.imageData) ? '<button onclick="openFile(' + index + ')">Datei oeffnen</button>' : '') +
+          ((record.fileData || record.imageData) ? '<button onclick="openFile(' + index + ')">Datei öffnen</button>' : '') +
           '<button onclick="openJson(' + index + ')">JSON</button>' +
           '</div></article>';
-      }).join('') || '<p class="muted">Keine Eintraege gefunden.</p>';
+      }).join('') || '<p class="muted">Keine Einträge gefunden.</p>';
     }
 
     function openFile(index) {
@@ -1387,7 +1524,7 @@ function MediaCard({ item, onSave, onDelete, onUpdate, onDetails, compact = fals
         </div>
       )}
       <div className="flex flex-wrap gap-2 px-3 pb-3">
-        {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700" title="Trailer auf YouTube öffnen"><Play className="h-4 w-4 fill-white" />YouTube</Button>}
+        {item.trailerUrl && <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="youtube-btn" title="Trailer auf YouTube öffnen"><Play className="h-4 w-4 fill-white" />YouTube</Button>}
         {onDetails && <Button type="button" onClick={onDetails} className="bg-zinc-700 hover:bg-zinc-800">Details öffnen</Button>}
         <Button onClick={onSave || onDelete}>{onSave ? <Plus className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}{onSave ? 'Speichern' : 'Entfernen'}</Button>
       </div>
@@ -1422,7 +1559,7 @@ function MovieDetails({ item, onSave }) {
           </div>
           <div className="flex flex-wrap gap-2">
             {item.trailerUrl && (
-              <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="bg-red-600 hover:bg-red-700">
+              <Button type="button" onClick={() => window.open(item.trailerUrl, '_blank', 'noopener,noreferrer')} className="youtube-btn">
                 <Play className="h-4 w-4 fill-white" />YouTube
               </Button>
             )}
@@ -1650,7 +1787,7 @@ function Travel({ api }) {
       <Card>
         <div className="mb-3">
           <h2 className="font-semibold">Reiseplaner</h2>
-          <p className="text-sm text-zinc-500">Stadt, Dauer und Reisetyp waehlen. Danach erstellt die Webseite Tagesplan, Karte, Hotels und Tipps.</p>
+          <p className="text-sm text-zinc-500">Stadt, Dauer und Reisetyp wählen. Danach erstellt die Webseite Tagesplan, Karte, Hotels und Tipps.</p>
         </div>
         <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_120px_180px_auto]">
           <TextInput value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Stadt, z. B. Barcelona" />
@@ -1843,7 +1980,7 @@ function List({ items, remove, render }) {
             <button type="button" className="icon-btn" onClick={() => remove(item.id)} aria-label="Löschen"><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
-        {!items.length && <p className="text-sm text-zinc-500">Noch keine Eintraege.</p>}
+        {!items.length && <p className="text-sm text-zinc-500">Noch keine Einträge.</p>}
       </div>
     </Card>
   );
@@ -1852,11 +1989,11 @@ function List({ items, remove, render }) {
 function BooksPage() {
   const books = [
     {
-      id: 'scalping-preview',
-      title: 'Scalping lernen: vom Chart-Chaos zum Entscheidungsbaum',
-      subtitle: 'Preview-Entwurf aus transkribiertem Videomaterial',
-      htmlUrl: '/books/scalping-preview-book.html',
-      pdfUrl: '/books/scalping-preview-book.pdf'
+      id: 'scalping-masterbuch',
+      title: 'Scalping Masterbuch',
+      subtitle: 'Arbeitsbuch aus 105 Scalping-Videos mit Setups, Risiko, Orderflow und Playbooks',
+      htmlUrl: '/books/scalping-masterbuch.html',
+      pdfUrl: '/books/scalping-masterbuch.pdf'
     }
   ];
   const [activeBook, setActiveBook] = useState(books[0]);
@@ -1866,12 +2003,12 @@ function BooksPage() {
       <Card>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Buecher</h2>
-            <p className="mt-1 text-sm text-zinc-500">Deine privaten HTML-Buecher direkt in der Webseite lesen.</p>
+            <h2 className="text-lg font-semibold">Bücher</h2>
+            <p className="mt-1 text-sm text-zinc-500">Deine privaten HTML-Bücher direkt in der Webseite lesen.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={() => window.open(activeBook.htmlUrl, '_blank', 'noopener,noreferrer')}>
-              <BookOpen className="h-4 w-4" />Separat oeffnen
+              <BookOpen className="h-4 w-4" />Separat öffnen
             </Button>
             <Button type="button" className="bg-zinc-700" onClick={() => window.open(activeBook.pdfUrl, '_blank', 'noopener,noreferrer')}>
               <Download className="h-4 w-4" />PDF
@@ -1910,7 +2047,7 @@ function BooksPage() {
   );
 }
 
-function SettingsPage({ api }) {
+function SettingsPage({ api, onLogout }) {
   const [users, setUsers] = useState([]);
   const [loginEvents, setLoginEvents] = useState([]);
   const [form, setForm] = useState({ username: '', password: '' });
@@ -1978,6 +2115,15 @@ function SettingsPage({ api }) {
   return (
     <div className="space-y-4">
       <Card>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-semibold">Sitzung</h2>
+            <p className="mt-1 text-sm text-zinc-500">Hier kannst du dich sauber von MyWEB abmelden.</p>
+          </div>
+          <Button type="button" className="bg-red-600 text-white hover:bg-red-700" onClick={onLogout}>Abmelden</Button>
+        </div>
+      </Card>
+      <Card>
         <h2 className="mb-3 font-semibold">Daten sichern</h2>
         <div className="grid gap-3 md:grid-cols-[auto_1fr]">
           <Button type="button" onClick={exportData}><Download className="h-4 w-4" />Alles exportieren</Button>
@@ -2044,17 +2190,13 @@ function LifeHub() {
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Neue Zentrale</p>
         <h1 className="mt-2 text-3xl font-black">Life Dashboard</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-300">
-          Deine alte Webseite bleibt erhalten. Dieser Bereich erweitert sie um Wetter, Kalender, Trello, Musik, Zitate, Witze und KI-Assistent.
+          Deine alte Webseite bleibt erhalten. Dieser Bereich bündelt Wetter, Kalender, Musik und KI-Assistent ohne doppelte Film- oder Aufgabenbereiche.
         </p>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
         <WeatherWidget />
-        <QuoteWidget />
-        <JokeWidget />
-        <MoviesWidget />
         <CalendarWidget />
         <MusicWidget />
-        <TrelloWidget />
       </div>
       <AssistantWidget />
     </div>
@@ -2064,49 +2206,73 @@ function LifeHub() {
 function App() {
   const [token, setToken] = useState(localStorage.getItem('pd:token'));
   const [page, setPage] = useState('dashboard');
-  const [dark, setDark] = useState(localStorage.getItem('pd:dark') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('pd:dark') !== 'false');
   const api = useApi(token, () => setToken(null));
+  const currentUser = useMemo(() => decodeTokenPayload(token), [token]);
+  const isAdmin = currentUser?.isAdmin || String(currentUser?.username || '').toLowerCase() === 'philipp';
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('pd:dark', String(dark));
   }, [dark]);
 
+  function logout() {
+    localStorage.removeItem('pd:token');
+    localStorage.removeItem('life:token');
+    setToken(null);
+    setPage('dashboard');
+  }
+
   if (window.location.pathname === '/google/callback') return <GoogleCallbackPage />;
   if (!token) return <Login onLogin={(next) => { localStorage.setItem('pd:token', next); localStorage.setItem('life:token', next); setToken(next); }} />;
 
   const pages = {
     dashboard: <Dashboard api={api} />,
-    tasks: <TrelloWidget title="To-do" intro={false} />,
-    invoices: <BookkeepingPage />,
+    tasks: <TrelloWidget title="Aufgaben" intro={false} />,
+    invoices: <BookkeepingPage initialSection="invoice" />,
+    offers: <BookkeepingPage initialSection="offer" />,
     media: <Media api={api} />,
     news: <News api={api} />,
     travel: <Travel api={api} />,
     stocks: <Stocks api={api} />,
     books: <BooksPage />,
     life: <LifeHub />,
-    settings: <SettingsPage api={api} />
+    settings: isAdmin ? <SettingsPage api={api} onLogout={logout} /> : <Dashboard api={api} />
   };
-  const mainNav = nav.filter((item) => item.id !== 'settings');
-  const settingsNav = nav.find((item) => item.id === 'settings');
+  const visibleNav = nav.filter((item) => item.id !== 'settings' || isAdmin);
+  const mainNav = visibleNav.filter((item) => item.id !== 'settings');
+  const settingsNav = visibleNav.find((item) => item.id === 'settings');
+  const navItems = mainNav.flatMap((item) => item.children || item);
+  const currentNavItem = navItems.find((item) => item.id === page) || visibleNav.find((item) => item.id === page);
 
   return (
-    <div className="min-h-screen bg-zinc-100 text-ink dark:bg-zinc-950 dark:text-zinc-100">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 md:flex">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="font-semibold">Mein Dashboard</h1>
+    <div className="app-shell min-h-screen bg-zinc-100 text-ink dark:bg-zinc-950 dark:text-zinc-100">
+      <aside className="sidebar-modern fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 md:flex">
+        <div className="brand-bar mb-6 flex items-center justify-between">
+          <h1 className="brand-title text-lg font-black">MyWEB</h1>
           <button className="icon-btn" onClick={() => setDark(!dark)}>{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
         </div>
-        <nav className="flex-1 space-y-1">{mainNav.map((item) => <NavButton key={item.id} item={item} active={page === item.id} onClick={() => setPage(item.id)} />)}</nav>
+        <nav className="flex-1 space-y-1">
+          {mainNav.map((item) => (
+            <div key={item.id} className="space-y-1">
+              <NavButton item={item} active={page === item.id || item.children?.some((child) => child.id === page)} onClick={() => setPage(item.children?.[0]?.id || item.id)} />
+              {item.children && (
+                <div className="ml-6 space-y-1 border-l border-white/10 pl-2">
+                  {item.children.map((child) => <NavButton key={child.id} item={child} active={page === child.id} onClick={() => setPage(child.id)} sub />)}
+                </div>
+              )}
+            </div>
+          ))}
+        </nav>
         {settingsNav && <nav className="border-t border-zinc-200 pt-3 dark:border-zinc-800"><NavButton item={settingsNav} active={page === settingsNav.id} onClick={() => setPage(settingsNav.id)} /></nav>}
       </aside>
       <main className="md:pl-64">
         <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 p-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 md:hidden">
-          <div className="flex gap-2 overflow-x-auto">{nav.map((item) => <NavButton key={item.id} item={item} active={page === item.id} onClick={() => setPage(item.id)} compact />)}</div>
+          <div className="flex gap-2 overflow-x-auto">{visibleNav.flatMap((item) => item.children || item).map((item) => <NavButton key={item.id} item={item} active={page === item.id} onClick={() => setPage(item.id)} compact />)}</div>
         </header>
         <section className="p-4 md:p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">{nav.find((item) => item.id === page)?.label}</h2>
+            <h2 className="page-title text-2xl font-black">{currentNavItem?.label}</h2>
             <button className="icon-btn md:hidden" onClick={() => setDark(!dark)}>{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
           </div>
           {pages[page]}
@@ -2116,10 +2282,10 @@ function App() {
   );
 }
 
-function NavButton({ item, active, onClick, compact }) {
+function NavButton({ item, active, onClick, compact, sub }) {
   const Icon = item.icon;
   return (
-    <button onClick={onClick} className={`flex h-10 items-center gap-2 rounded-md px-3 text-sm ${compact ? 'shrink-0' : 'w-full'} ${active ? 'bg-ink text-white dark:bg-white dark:text-ink' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+    <button onClick={onClick} className={`nav-button flex h-10 items-center gap-2 rounded-md px-3 text-sm ${compact ? 'shrink-0' : 'w-full'} ${sub ? 'h-9 text-xs' : ''} ${active ? 'nav-active bg-ink text-white dark:bg-white dark:text-ink' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
       <Icon className="h-4 w-4" />
       {item.label}
     </button>

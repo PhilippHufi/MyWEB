@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.DEFAULT_USERNAME || process.env.DEFAULT_USER_EMAIL || 'admin';
+  const adminEmail = process.env.ADMIN_USERNAME || 'Philipp';
   const password = process.env.DEFAULT_USER_PASSWORD || 'dashboard123';
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -16,6 +17,14 @@ async function main() {
     update: { passwordHash },
     create: { email, passwordHash }
   });
+
+  if (adminEmail && adminEmail !== email) {
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: { passwordHash },
+      create: { email: adminEmail, passwordHash }
+    });
+  }
 
   if (process.env.DEFAULT_USERNAME && process.env.DEFAULT_USER_EMAIL && process.env.DEFAULT_USERNAME !== process.env.DEFAULT_USER_EMAIL) {
     await prisma.user.upsert({

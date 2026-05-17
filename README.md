@@ -49,7 +49,7 @@ Für Railway:
 
 ## Receipt Scanner / Rechnungen
 
-Der Rechnungsbereich nutzt jetzt Browser-OCR mit Tesseract.js und speichert gescannte Rechnungen ueber einen Cloudflare Worker in Cloudflare KV. Das Foto wird als Data-URL zusammen mit Datum, Betrag, Rohtext und Zeitstempel gespeichert, damit es spaeter wieder in der Webseite geoeffnet werden kann.
+Der Rechnungsbereich nutzt jetzt Browser-OCR mit Tesseract.js und speichert gescannte Rechnungen über einen Cloudflare Worker in Cloudflare KV. Das Foto wird als Data-URL zusammen mit Datum, Betrag, Rohtext und Zeitstempel gespeichert, damit es später wieder in der Webseite geöffnet werden kann.
 
 Cloudflare Worker einrichten:
 
@@ -76,6 +76,14 @@ https://myweb-receipt-scanner.philipp-myweb.workers.dev
 ## Projektgedächtnis
 
 Wichtige Hosting- und Wiederaufbau-Infos stehen in `PROJECT_MEMORY.md`.
+
+## Benutzer und Admin
+
+`Philipp` ist der Admin-Benutzer. Nur dieser Benutzer darf neue Benutzer anlegen, vorhandene Benutzer bearbeiten oder Login-Ereignisse einsehen. Die Admin-Prüfung passiert im Backend und wird zusätzlich im Frontend für die Navigation berücksichtigt.
+
+## Handy-App / PWA
+
+Die Webseite ist als Progressive Web App vorbereitet. Auf iPhone/Android kann sie über den Browser mit "Zum Home-Bildschirm" installiert und danach wie eine App geöffnet werden. Manifest, Icons und Service Worker liegen im Frontend unter `public/`.
 
 Full-stack private dashboard with React, Tailwind CSS, Express, Prisma and SQLite.
 

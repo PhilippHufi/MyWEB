@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scalping Masterbuch</title>
+  <style>
+    :root {
+      --ink: #162029;
+      --muted: #5e6b75;
+      --paper: #f7f5ee;
+      --card: #ffffff;
+      --line: #ddd7c7;
+      --accent: #b88a2b;
+      --teal: #277981;
+      --red: #a2463d;
+      --dark: #111820;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.62;
+      font-size: 16px;
+    }
+    .cover {
+      min-height: 92vh;
+      color: white;
+      display: grid;
+      align-items: end;
+      padding: 64px;
+      background:
+        linear-gradient(110deg, rgba(17,24,32,.96), rgba(17,24,32,.72)),
+        linear-gradient(135deg, #111820, #263a40 45%, #8c6a2a);
+      page-break-after: always;
+    }
+    .cover h1 {
+      margin: 0 0 22px;
+      max-width: 1050px;
+      font-size: clamp(44px, 8vw, 88px);
+      line-height: .95;
+      letter-spacing: 0;
+    }
+    .cover p {
+      max-width: 860px;
+      color: rgba(255,255,255,.86);
+      font-size: 21px;
+      margin: 0 0 32px;
+    }
+    .pills { display: flex; gap: 12px; flex-wrap: wrap; }
+    .pill {
+      padding: 8px 12px;
+      border: 1px solid rgba(255,255,255,.33);
+      border-radius: 999px;
+      font-size: 14px;
+      color: rgba(255,255,255,.88);
+    }
+    main { max-width: 1040px; margin: 0 auto; padding: 42px 32px 88px; }
+    .toc {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 28px;
+      page-break-after: always;
+    }
+    .toc ol { columns: 2; padding-left: 22px; }
+    .toc li { break-inside: avoid; margin-bottom: 8px; }
+    .chapter {
+      border-top: 1px solid var(--line);
+      padding: 42px 0 28px;
+      page-break-before: always;
+    }
+    .kicker {
+      color: var(--accent);
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .08em;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 34px;
+      line-height: 1.12;
+      letter-spacing: 0;
+      margin: 0 0 18px;
+      color: #101820;
+    }
+    p { margin: 0 0 14px; }
+    img {
+      width: 100%;
+      display: block;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #111;
+    }
+    figure {
+      margin: 24px 0;
+      break-inside: avoid;
+    }
+    figcaption {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    figcaption span { color: #78838b; }
+    .callout {
+      margin: 22px 0;
+      padding: 18px 20px;
+      background: var(--card);
+      border-left: 5px solid var(--teal);
+      border-radius: 8px;
+    }
+    .callout strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+    .callout.warning { border-left-color: var(--red); background: #fff4f2; }
+    .callout.source { border-left-color: var(--accent); background: #fffaf0; }
+    .callout.online { border-left-color: #315f9c; background: #f2f6ff; }
+    .source {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 22px 0;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      break-inside: avoid;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th { background: #e8e1d1; color: #111820; }
+    tr:last-child td { border-bottom: 0; }
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 18px 0;
+      display: grid;
+      gap: 8px;
+    }
+    .checklist li {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px 10px 34px;
+      position: relative;
+    }
+    .checklist li:before {
+      content: "";
+      position: absolute;
+      left: 13px;
+      top: 17px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+    }
+    .footer {
+      border-top: 1px solid var(--line);
+      margin-top: 42px;
+      padding-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @page { size: A4; margin: 15mm 13mm; }
+    @media print {
+      body { background: #fff; font-size: 13px; }
+      .cover { min-height: 267mm; margin: -15mm -13mm 0; }
+      main { padding: 0; max-width: none; }
+      a { color: inherit; text-decoration: none; }
+      .chapter { break-before: page; }
+    }
+  </style>
+</head>
+<body>
+  <header class="cover">
+    <div>
+      <h1>Scalping Masterbuch</h1>
+      <p>Ein praktisches Arbeitsbuch aus deinen 105 Scalping-Videos: Marktstruktur, EMAs, Volume Profile, Point of Control, Low Volume Nodes, Orderflow, Risiko, Entry, Stop, Take Profit und Live-Trade-Management.</p>
+      <div class="pills">
+        <span class="pill">105 Videos ausgewertet</span>
+        <span class="pill">24 echte Screenshots</span>
+        <span class="pill">Deutsch</span>
+        <span class="pill">Stand: 17. Mai 2026</span>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="toc">
+      <div class="kicker">Inhalt</div>
+      <h2>Vom Zuschauen zum ausführbaren Scalping-System</h2>
+      <ol><li>Was Scalping in diesem Kurs wirklich bedeutet</li><li>Der Entscheidungsbaum vor jedem Scalping-Trade</li><li>15M, 3M und 1M richtig zusammensetzen</li><li>Die 50er, 100er und 200er als Scalping-Gerüst</li><li>Der konkrete EMA-Scalp</li><li>Warum der Retest wichtiger ist als der erste Break</li><li>Range, Konsolidierung und die Frage: oben, unten oder Mitte?</li><li>Point of Control, Value Area und Low Volume Nodes</li><li>Warum dünne Zonen gefährlich und wertvoll sind</li><li>Ungleichgewicht, Gap Close und Balance-Wiederherstellung</li><li>Long- und Short-Confirmation als Pflichtfilter</li><li>Footprint, Absorption und Bookmap ohne Überforderung</li><li>Warum BTC nicht isoliert gehandelt wird</li><li>Warum weniger Coins besser sind</li><li>Teilposition, Full Size und Stop-Logik</li><li>Gewinne sichern, bevor Gebühren und Gegenbewegung sie fressen</li><li>Wann der Zug abgefahren ist</li><li>Wann du raus musst, auch wenn die Idee noch schön klingt</li><li>Timing, Volatilität und die besten Lernfenster</li><li>So wird ein Scalp Schritt für Schritt geführt</li><li>Die vier Kernsetups aus dem Material</li><li>Wann ein Trade groß genug ist</li><li>30 Tage vom Zuschauen zur Ausführung</li><li>Die Vorlage für jeden Scalping-Trade</li><li>Die 25 Regeln, die das ganze Buch zusammenhalten</li><li>Wie gut Scalping wirklich funktionieren kann</li><li>Was einen perfekten Scalp ausmacht</li><li>Wie aus Scalps ein positiver Erwartungswert wird</li><li>Profi-Prinzipien statt Guru-Kopie</li><li>Was externe Quellen bestätigen und was nicht</li><li>Vier Setups als ausführbare Playbooks</li><li>Warum ein Setup trotz richtiger Idee scheitert</li><li>Vom Buch zum eigenen System</li><li>Die letzte Seite vor dem echten Trade</li><li>Welche Dateien in die Auswertung eingeflossen sind</li></ol>
+    </section>
+    <section class="chapter"><div class="kicker">Start</div><h2>Was Scalping in diesem Kurs wirklich bedeutet</h2><p>Scalping ist hier kein blindes Klicken auf jede kleine Kerze. Die Videos zeigen eine sehr klare Denkweise: Der Markt wird zuerst in Kontext, Struktur und Entscheidungszonen zerlegt. Erst danach wird auf kleinen Timeframes ein Entry gesucht. Der Scalper will nicht recht haben. Er will an Stellen handeln, an denen der Markt eine Entscheidung treffen muss.</p>
+    <p>Das zentrale Muster ist immer gleich: grobe Richtung erkennen, Range oder Trend bestimmen, wichtige Preiszonen markieren, Reaktion abwarten, Position klein genug wählen, schnell managen und nicht in gelaufene Bewegungen hineinspringen.</p>
+    <aside class="callout source"><strong>Quelle dieses Buches</strong><p>Dieses Buch basiert auf 105 lokal abgelegten Scalping-Videos und ca. 1992k Zeichen Transkriptmaterial. Es ist eine eigene, strukturierte Zusammenfassung in deutschen Lernkapiteln. Es ist kein wortgetreues Transkript.</p></aside>
+    <figure>
+    <img src="assets/screenshots/01-range.jpg" alt="Range und Marktstruktur">
+    <figcaption><strong>Range und Marktstruktur</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-10-29_14-11-11.mp4, Zeitpunkt ca. 4:44</span></figcaption>
+  </figure></section>
+<section class="chapter"><div class="kicker">Grundmodell</div><h2>Der Entscheidungsbaum vor jedem Scalping-Trade</h2><p>Jeder Trade beginnt mit einem Entscheidungsbaum. Wenn ein Punkt nicht beantwortet werden kann, ist der Trade nicht reif.</p>
+    <table><thead><tr><th>Schritt</th><th>Frage</th><th>Handlung</th></tr></thead><tbody><tr><td>1. Marktphase</td><td>Trend, Range oder Konsolidierung?</td><td>Nur Setups handeln, die zur Phase passen.</td></tr><tr><td>2. Kontext</td><td>Was machen BTC, Nasdaq/S&P oder der Hauptmarkt?</td><td>Gegen den dominanten Risikomarkt nur mit kleiner Größe.</td></tr><tr><td>3. Preiszone</td><td>Sind wir an EMA, POC, Value Area, LVN, Range High/Low?</td><td>Keine Trades in der Mitte ohne Vorteil.</td></tr><tr><td>4. Reaktion</td><td>Kommt Long- oder Short-Confirmation?</td><td>Entry erst nach sichtbarer Bestätigung.</td></tr><tr><td>5. Risiko</td><td>Kann der Stop logisch und finanziell getragen werden?</td><td>Sonst kein Trade oder Teilposition.</td></tr><tr><td>6. Management</td><td>Wo ist TP, wo ist Exit bei Gegenreaktion?</td><td>Vor Entry entscheiden, nicht während Stress.</td></tr></tbody></table>
+    <aside class="callout "><strong>Kernregel</strong><p>Der Entry ist nie die erste Idee. Der Entry ist die Antwort des Marktes auf eine vorher markierte Zone.</p></aside></section>
+<section class="chapter"><div class="kicker">Timeframes</div><h2>15M, 3M und 1M richtig zusammensetzen</h2><p>Die Videos arbeiten wiederholt mit einem großen Blick und einem schnellen Ausführungschart. Der 15-Minuten-Chart gibt Struktur und Bias. Der 3-Minuten-Chart zeigt, ob ein Pullback oder Durchbruch sauber ist. Der 1-Minuten-Chart dient nur für den präzisen Trigger und darf dich nicht vom übergeordneten Bild wegziehen.</p>
+    <table><thead><tr><th>Timeframe</th><th>Aufgabe</th><th>Was du suchst</th></tr></thead><tbody><tr><td>15 Minuten</td><td>Marktregime</td><td>Trend, Range, Konsolidierung, wichtige Hochs/Tiefs</td></tr><tr><td>3 Minuten</td><td>Setup-Zone</td><td>EMA-Test, Retest, Rejection, Range-Break</td></tr><tr><td>1 Minute</td><td>Trigger</td><td>Impuls, Wick, kleiner Strukturbruch, schnelle Invalidierung</td></tr></tbody></table>
+    <aside class="callout warning"><strong>Warnung aus dem Material</strong><p>Wer nur auf 1M starrt, sieht viele Signale, aber keinen Kontext. Genau dadurch entstehen Overtrading, schlechte Entries und zu spätes Reagieren.</p></aside></section>
+<section class="chapter"><div class="kicker">EMA-System</div><h2>Die 50er, 100er und 200er als Scalping-Gerüst</h2><p>Ein wiederkehrendes Grundsystem in den Videos ist das Arbeiten mit EMAs. Besonders wichtig ist die 50er-Zone: Sie wird als laufender Entscheidungsbereich genutzt. Der Kurs kann dort Support finden, ablehnen, durchbrechen oder nach einem Bruch retesten.</p>
+    <p>Das EMA-System ist keine Magie. Es ist ein Orientierungsraster: Wo ist der kurzfristige Trend? Wo könnte der nächste Rücklauf stoppen? Wo ist der Trade zu spät? Wann muss ein Gewinner geschützt werden?</p>
+    <figure>
+    <img src="assets/screenshots/02-ema-setup.jpg" alt="EMA-Grundsetup">
+    <figcaption><strong>EMA-Grundsetup</strong> - Die Szene nutzt die 50er-Zone/EMA als Entscheidungsbereich für Fortsetzung, Retest oder Exit.<br><span>Video: 2025-07-31_12-05-08.mp4, Zeitpunkt ca. 4:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Situation</th><th>Long-Idee</th><th>Short-Idee</th><th>Kein Trade</th></tr></thead><tbody><tr><td>Kurs über 50 EMA</td><td>Pullback hält über/auf EMA und Käufer reagieren</td><td>Nur wenn klare Schwäche und Bruch kommt</td><td>Wenn Kurs schon weit weggelaufen ist</td></tr><tr><td>Kurs bricht 50 EMA von unten</td><td>Long nach Retest und erneuter Stärke</td><td>Nicht direkt gegen Impuls shorten</td><td>Wenn Candle zu groß für sauberen Stop ist</td></tr><tr><td>Kurs unter 50 EMA</td><td>Nur Reclaim mit Bestätigung</td><td>Pullback an EMA wird abgelehnt</td><td>Wenn Range um EMA choppy ist</td></tr><tr><td>Alle EMAs über dem Kurs</td><td>Long nur nach starkem Reclaim</td><td>Short bevorzugt bei Ablehnung</td><td>Wenn Support direkt darunter liegt</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">EMA-Entry</div><h2>Der konkrete EMA-Scalp</h2><p>Der EMA-Scalp ist das Einsteiger-Setup aus dem Material. Er funktioniert am besten in klaren Bewegungen, nicht im zähen Seitwärtsmarkt. Du wartest, bis der Markt die EMA-Zone testet und dort eine Reaktion zeigt.</p>
+    <figure>
+    <img src="assets/screenshots/03-ema-break.jpg" alt="Durchbruch durch die 50er EMA">
+    <figcaption><strong>Durchbruch durch die 50er EMA</strong> - Die Szene nutzt die 50er-Zone/EMA als Entscheidungsbereich für Fortsetzung, Retest oder Exit.<br><span>Video: 2024-11-22_11-35-101.mp4, Zeitpunkt ca. 22:44</span></figcaption>
+  </figure>
+    <ul class="checklist"><li>15M zeigt Trend oder klare Richtung.</li><li>3M läuft an die 50er EMA oder bricht sie.</li><li>1M zeigt Reaktion: Wick, Reclaim, kleine Impulskerze oder Retest.</li><li>Entry erst nach Bestätigung, nicht mitten in die fallende/steigende Kerze.</li><li>Stop hinter die Reaktionszone, nicht willkürlich knapp.</li><li>TP früh sichern, wenn der Move bereits fortgeschritten ist.</li><li>Nach einem Scalp 3 bis 5 Minuten Pause, um Re-Entry-FOMO zu verhindern.</li></ul>
+    <aside class="callout "><strong>Praxisregel</strong><p>Lieber dreimal früher Profit nehmen als einmal zu spät reagieren. Das ist in den Videos ein wiederkehrender Gedanke, weil Gebühren, Hebel und schnelle Gegenbewegungen kleine Vorteile schnell auffressen.</p></aside></section>
+<section class="chapter"><div class="kicker">Retest</div><h2>Warum der Retest wichtiger ist als der erste Break</h2><p>Viele Anfänger kaufen den ersten Break oder shorten den ersten Drop. Das Material zeigt eine vorsichtigere Logik: Erst der Retest beweist, ob das Level akzeptiert wird. Der Break erzeugt Aufmerksamkeit. Der Retest entscheidet, ob daraus ein Trade wird.</p>
+    <figure>
+    <img src="assets/screenshots/04-ema-retest.jpg" alt="Retest nach EMA-Bruch">
+    <figcaption><strong>Retest nach EMA-Bruch</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-07-31_12-05-08.mp4, Zeitpunkt ca. 25:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Ablauf</th><th>Long-Retest</th><th>Short-Retest</th></tr></thead><tbody><tr><td>Break</td><td>Kurs bricht über EMA/Range/POC</td><td>Kurs bricht unter EMA/Range/POC</td></tr><tr><td>Rücklauf</td><td>Preis fällt zurück zum alten Widerstand</td><td>Preis steigt zurück zum alten Support</td></tr><tr><td>Bestätigung</td><td>Zone hält, Käufer reagieren</td><td>Zone hält von unten, Verkäufer reagieren</td></tr><tr><td>Entry</td><td>nach kleiner Struktur nach oben</td><td>nach kleiner Struktur nach unten</td></tr><tr><td>Invalidierung</td><td>Rückfall unter Retest-Tief</td><td>Rückkehr über Retest-Hoch</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Range</div><h2>Range, Konsolidierung und die Frage: oben, unten oder Mitte?</h2><p>Die Videos betonen immer wieder, dass man wissen muss, ob der Markt trendet oder nur eine Range ausbildet. In einer Range sind die besten Scalps an den Rändern, nicht in der Mitte. Die Mitte ist Entscheidungsnebel.</p>
+    <figure>
+    <img src="assets/screenshots/18-range-break.jpg" alt="Range-Break und Fortsetzung">
+    <figcaption><strong>Range-Break und Fortsetzung</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-06-26_18-22-30.mp4, Zeitpunkt ca. 10:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Ort in der Range</th><th>Was du erwartest</th><th>Trade-Idee</th></tr></thead><tbody><tr><td>Range Low</td><td>Käufer verteidigen oder Bruch beschleunigt</td><td>Long-Reclaim oder Short-Break-Retest</td></tr><tr><td>Range High</td><td>Verkäufer verteidigen oder Breakout</td><td>Short-Rejection oder Long-Break-Retest</td></tr><tr><td>Range Mitte</td><td>Richtungswechsel, Chop, Fehlsignale</td><td>Meist kein Trade</td></tr><tr><td>Nach Range Break</td><td>Fortsetzung oder Fakeout</td><td>Retest abwarten</td></tr></tbody></table>
+    <aside class="callout warning"><strong>Kein Trade in der Mitte</strong><p>Wenn du nicht sagen kannst, ob du an Support, Resistance, POC, Value Area oder EMA bist, bist du wahrscheinlich in der Mitte. Dort ist der Vorteil meist zu klein.</p></aside></section>
+<section class="chapter"><div class="kicker">Volume Profile</div><h2>Point of Control, Value Area und Low Volume Nodes</h2><p>Ein großer Teil des Materials dreht sich um Volumenprofile. Der Point of Control ist der Preisbereich mit dem meisten gehandelten Volumen in einer definierten Range. Value Area High/Low zeigen die obere und untere Grenze des fairen Bereichs. Low Volume Nodes sind dünn gehandelte Zonen, in denen der Markt oft schnell durchläuft oder scharf reagiert.</p>
+    <figure>
+    <img src="assets/screenshots/05-poc.jpg" alt="Point of Control als Entscheidungszone">
+    <figcaption><strong>Point of Control als Entscheidungszone</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-06-26_18-52-30.mp4, Zeitpunkt ca. 19:44</span></figcaption>
+  </figure>
+    <figure>
+    <img src="assets/screenshots/06-value-area.jpg" alt="Value Area High/Low">
+    <figcaption><strong>Value Area High/Low</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-08-05_12-50-51.mp4, Zeitpunkt ca. 16:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Begriff</th><th>Bedeutung</th><th>Scalping-Nutzung</th></tr></thead><tbody><tr><td>POC</td><td>Preis mit viel Volumen</td><td>Entscheidungszone: halten, reclaimen oder verlieren</td></tr><tr><td>VAH</td><td>Oberer Value-Area-Rand</td><td>Widerstand, Breakout-Zone oder Retest-Level</td></tr><tr><td>VAL</td><td>Unterer Value-Area-Rand</td><td>Support, Breakdown-Zone oder Reclaim-Level</td></tr><tr><td>LVN</td><td>Dünner Volumenbereich</td><td>Schnelle Bewegung möglich, nicht blind dagegenstellen</td></tr><tr><td>Range Profile</td><td>Volumen nur für ausgewählte Struktur</td><td>Genauer als globales Profil für Scalps</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Low Volume Node</div><h2>Warum dünne Zonen gefährlich und wertvoll sind</h2><p>Low Volume Nodes sind im Material wichtig, weil sie zeigen, wo wenig Marktakzeptanz stattgefunden hat. Wenn der Preis in solche Zonen fällt oder steigt, kann die Bewegung schnell werden. Gleichzeitig kann eine Reaktion an der Kante stark sein.</p>
+    <figure>
+    <img src="assets/screenshots/07-low-volume.jpg" alt="Low Volume Node">
+    <figcaption><strong>Low Volume Node</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-12-09_16-10-07.mp4, Zeitpunkt ca. 1:44</span></figcaption>
+  </figure>
+    <ul class="checklist"><li>LVN ist kein Entry allein.</li><li>An der LVN-Kante auf Reaktion warten.</li><li>Wenn der Preis in die LVN hinein akzeptiert wird, kann er schnell zur nächsten Volumenzone laufen.</li><li>Stop nicht mitten in die LVN legen, wenn dort schnelle Durchläufe typisch sind.</li><li>LVN immer mit Struktur, EMA oder Range kombinieren.</li></ul></section>
+<section class="chapter"><div class="kicker">Imbalance</div><h2>Ungleichgewicht, Gap Close und Balance-Wiederherstellung</h2><p>In vielen Videos wird sinngemäß gefragt: Hat der Markt eine Bewegung sauber ausbalanciert oder gibt es eine offene Imbalance? Eine schnelle einseitige Bewegung hinterlässt oft Bereiche, in denen wenig Gegenhandel stattgefunden hat. Der Markt kann diese Bereiche später teilweise schließen oder durch Konsolidierung ausgleichen.</p>
+    <figure>
+    <img src="assets/screenshots/08-imbalance.jpg" alt="Imbalance und Gap Close">
+    <figcaption><strong>Imbalance und Gap Close</strong> - Die Szene dreht sich um unausgeglichene Preisbereiche und die Frage, ob der Markt Balance wiederherstellt.<br><span>Video: 2026-02-03_15-05-14-00.25.27.405-00.55.45.100-seg2.mp4, Zeitpunkt ca. 1:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Imbalance-Situation</th><th>Interpretation</th><th>Trade-Plan</th></tr></thead><tbody><tr><td>Starker Push ohne Gegenhandel</td><td>Markt ist einseitig gelaufen</td><td>Nicht spät hinterherspringen</td></tr><tr><td>Konsolidierung nach Push</td><td>Balance wird aufgebaut</td><td>Ausbruch oder Rejection abwarten</td></tr><tr><td>Gap Close / Rücklauf</td><td>Markt holt offene Zone ab</td><td>TP-Ziel oder Reversal-Zone</td></tr><tr><td>Imbalance bleibt offen</td><td>Trend bleibt stark</td><td>Nur Pullback-Continuation suchen</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Confirmation</div><h2>Long- und Short-Confirmation als Pflichtfilter</h2><p>Das Wort Confirmation taucht im Material ständig auf. Gemeint ist: Nicht die Meinung wird gehandelt, sondern die Bestätigung. Long wird erst interessant, wenn der Markt an einer vorbereiteten Zone Stärke zeigt. Short wird erst interessant, wenn der Markt an einer vorbereiteten Zone Schwäche zeigt.</p>
+    <figure>
+    <img src="assets/screenshots/09-long-confirm.jpg" alt="Long Confirmation">
+    <figcaption><strong>Long Confirmation</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-01-07_08-14-53.mp4, Zeitpunkt ca. 1:44</span></figcaption>
+  </figure>
+    <figure>
+    <img src="assets/screenshots/10-short-confirm.jpg" alt="Short Confirmation">
+    <figcaption><strong>Short Confirmation</strong> - Die Szene nutzt die 50er-Zone/EMA als Entscheidungsbereich für Fortsetzung, Retest oder Exit.<br><span>Video: 2024-12-11_07-33-08.mp4, Zeitpunkt ca. 10:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Confirmation</th><th>Long</th><th>Short</th></tr></thead><tbody><tr><td>Level-Reaktion</td><td>Support hält, Käufer reagieren</td><td>Resistance hält, Verkäufer reagieren</td></tr><tr><td>EMA</td><td>Reclaim oder Bounce</td><td>Ablehnung oder Bruch</td></tr><tr><td>POC/Value</td><td>POC wird zurückerobert</td><td>POC wird verloren</td></tr><tr><td>Kerzenstruktur</td><td>höheres Tief, Impulskerze</td><td>tieferes Hoch, Abverkauf</td></tr><tr><td>Invalidierung</td><td>Level wird klar verloren</td><td>Level wird klar zurückerobert</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Orderflow</div><h2>Footprint, Absorption und Bookmap ohne Überforderung</h2><p>Die fortgeschritteneren Videos gehen deutlich in Richtung Orderflow. Footprint und Bookmap sollen nicht dekorativ sein. Sie werden genutzt, um zu sehen, ob an einer Zone wirklich gekauft, verkauft oder absorbiert wird.</p>
+    <figure>
+    <img src="assets/screenshots/11-footprint.jpg" alt="Footprint / Orderflow">
+    <figcaption><strong>Footprint / Orderflow</strong> - Die Szene wurde als visuelle Referenz aus dem Videomaterial aufgenommen und im jeweiligen Kapitel eingeordnet.<br><span>Video: 2026-02-10_15-30-04.mp4, Zeitpunkt ca. 19:44</span></figcaption>
+  </figure>
+    <figure>
+    <img src="assets/screenshots/12-bookmap.jpg" alt="Bookmap / Liquidität">
+    <figcaption><strong>Bookmap / Liquidität</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-10-06_19-05-43.mp4, Zeitpunkt ca. 4:44</span></figcaption>
+  </figure>
+    <figure>
+    <img src="assets/screenshots/22-absorption.jpg" alt="Absorption">
+    <figcaption><strong>Absorption</strong> - Die Szene wurde als visuelle Referenz aus dem Videomaterial aufgenommen und im jeweiligen Kapitel eingeordnet.<br><span>Video: 2026-02-17_15-09-11-00.23.16.502-00.46.23.000-seg2.mp4, Zeitpunkt ca. 4:44</span></figcaption>
+  </figure>
+    <aside class="callout warning"><strong>Wichtig</strong><p>Orderflow ersetzt nicht den Chart-Kontext. Er verfeinert nur die Entscheidung an einer vorbereiteten Zone. Wer ohne Struktur in Footprint-Daten schaut, wird eher verwirrt als besser.</p></aside>
+    <table><thead><tr><th>Signal</th><th>Bedeutung</th><th>Handlung</th></tr></thead><tbody><tr><td>Absorption</td><td>Eine Seite nimmt aggressive Orders auf</td><td>Nicht blind dagegenhalten, Bestätigung abwarten</td></tr><tr><td>Bid/Ask Druck</td><td>Kurzfristiges Ungleichgewicht</td><td>Nur an Leveln sinnvoll</td></tr><tr><td>Bookmap-Liquidität</td><td>Sichtbare Orders/Zonen</td><td>Als Ziel oder Reaktionsbereich nutzen</td></tr><tr><td>POC-Verschiebung</td><td>Akzeptanz wandert</td><td>Bias anpassen</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Marktkorrelation</div><h2>Warum BTC nicht isoliert gehandelt wird</h2><p>In mehreren Videos wird Bitcoin im Kontext von Nasdaq, S&P und allgemeinem Risikoappetit betrachtet. Ein scheinbar guter BTC-Scalp kann scheitern, wenn der breitere Markt im selben Moment gegen dich läuft. Das ist besonders wichtig bei Scalps, weil der Zeithorizont kurz und der Spielraum klein ist.</p>
+    <figure>
+    <img src="assets/screenshots/13-nasdaq.jpg" alt="BTC im Kontext Nasdaq/S&amp;P">
+    <figcaption><strong>BTC im Kontext Nasdaq/S&amp;P</strong> - Die Szene verknüpft den Kryptomarkt mit dem breiteren Risiko-Markt und zeigt, warum Kontext vor Entry kommt.<br><span>Video: 2026-01-27_16-00-48.mp4, Zeitpunkt ca. 34:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Kontext</th><th>Bedeutung</th><th>Scalping-Folge</th></tr></thead><tbody><tr><td>Nasdaq bricht aus</td><td>Risk-On kann BTC/Alts stützen</td><td>Shorts strenger filtern</td></tr><tr><td>Nasdaq verliert Level</td><td>Risk-Off kann BTC belasten</td><td>Longs kleiner oder auslassen</td></tr><tr><td>BTC stark, Alts schwach</td><td>Selektiver Markt</td><td>Nur Top-Assets handeln</td></tr><tr><td>Alle Assets choppy</td><td>Kein klarer Flow</td><td>Weniger Trades, kleinere Size</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Asset-Auswahl</div><h2>Warum weniger Coins besser sind</h2><p>Das Material legt nahe: Es reicht, wenige Lieblingsmärkte wirklich gut zu kennen. Zu viele Altcoins gleichzeitig erzeugen Stress, schlechte Ausführung und halbe Aufmerksamkeit. Für Scalping sind Liquidität, Spread, Volatilität und saubere Chartstruktur wichtiger als die Hoffnung auf den nächsten Hype.</p>
+    <figure>
+    <img src="assets/screenshots/16-altcoins.jpg" alt="Altcoins selektiv handeln">
+    <figcaption><strong>Altcoins selektiv handeln</strong> - Die Szene zeigt, wie dünne Volumenbereiche als schnelle Bewegungs- oder Reaktionszonen interpretiert werden.<br><span>Video: altcoin_talk_med_qual.mp4, Zeitpunkt ca. 61:44</span></figcaption>
+  </figure>
+    <ul class="checklist"><li>Hauptmarkt zuerst: BTC als Orientierung.</li><li>Nur liquide Altcoins, die du regelmäßig beobachtest.</li><li>Keine zehn Charts gleichzeitig aktiv scalpen.</li><li>Wenn der Hauptmarkt unklar ist, Altcoin-Scalps reduzieren.</li><li>Nur handeln, wenn Level, Reaktion und Risiko klar sind.</li></ul></section>
+<section class="chapter"><div class="kicker">Positionsgröße</div><h2>Teilposition, Full Size und Stop-Logik</h2><p>Ein starkes Motiv im Material ist, mit kleiner Größe zu arbeiten, wenn der Markt nicht perfekt ist. Eine Teilposition gibt dir Luft für einen größeren logischen Stop und schützt das Portfolio. Full Size ist nur für Situationen gedacht, in denen Markt, Level, Confirmation und Momentum gleichzeitig stimmen.</p>
+    <figure>
+    <img src="assets/screenshots/14-risk.jpg" alt="Teilposition und Stop-Management">
+    <figcaption><strong>Teilposition und Stop-Management</strong> - Die Szene behandelt Positionsgröße, Stop und die Frage, wann man mit kleiner Größe arbeitet.<br><span>Video: 2025-11-10_17-50-54.mp4, Zeitpunkt ca. 19:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Marktzustand</th><th>Positionsgröße</th><th>Warum</th></tr></thead><tbody><tr><td>Unklar, aber Idee vorhanden</td><td>Teilposition</td><td>Du kannst einen sinnvolleren Stop setzen</td></tr><tr><td>A-Setup mit Bestätigung</td><td>Normale Größe</td><td>Risiko ist berechenbar</td></tr><tr><td>A+ Momentum und klare Zone</td><td>Full Size möglich</td><td>Nur wenn vorher geplant</td></tr><tr><td>Nach Verlust oder Chop</td><td>0 bis sehr klein</td><td>Overtrading verhindern</td></tr></tbody></table>
+    <aside class="callout "><strong>Stop-Regel</strong><p>Der Stop gehört hinter die Stelle, an der die Idee falsch ist. Wenn dieser Stop zu teuer ist, wird die Größe reduziert. Der Stop wird nicht enger gemacht, nur damit die Position größer sein darf.</p></aside></section>
+<section class="chapter"><div class="kicker">Take Profit</div><h2>Gewinne sichern, bevor Gebühren und Gegenbewegung sie fressen</h2><p>Scalping ist kein Swingtrading. Mehrfach wird betont, dass man mit Gewinnen zufrieden sein muss. Ein kleiner Scalp mit sauberem Exit ist besser als ein Gewinn, der wieder in den Stop läuft. Besonders mit Hebel können kleine Kursbewegungen genügen; gleichzeitig können Gebühren und Slippage mehrere schlechte Re-Entries teuer machen.</p>
+    <figure>
+    <img src="assets/screenshots/15-tp.jpg" alt="Take Profit statt Hoffnung">
+    <figcaption><strong>Take Profit statt Hoffnung</strong> - Die Szene behandelt Positionsgröße, Stop und die Frage, wann man mit kleiner Größe arbeitet.<br><span>Video: 2025-07-03_19-04-06.mp4, Zeitpunkt ca. 58:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Situation</th><th>Management</th></tr></thead><tbody><tr><td>Move läuft schnell in dein Ziel</td><td>Teilgewinn oder Vollausstieg prüfen</td></tr><tr><td>Preis erreicht nächste EMA/POC/Range-Kante</td><td>Reaktion beobachten, nicht hoffen</td></tr><tr><td>Gegenimpuls entsteht</td><td>Stop nachziehen oder schließen</td></tr><tr><td>Du bist spät eingestiegen</td><td>TP schneller nehmen</td></tr><tr><td>Nach TP entsteht sofort neue Chance</td><td>3-5 Minuten Pause statt impulsivem Re-Entry</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Kein Entry</div><h2>Wann der Zug abgefahren ist</h2><p>Eine der wertvollsten Regeln aus dem Material: Wenn der Kurs bereits weit weg von der Entscheidungszone gelaufen ist, steigst du nicht mehr ein. Es kommen neue Chancen. Der Preis soll zu deinem Plan kommen, nicht du dem Preis hinterher.</p>
+    <figure>
+    <img src="assets/screenshots/19-no-entry.jpg" alt="Kein Entry nach gelaufenem Move">
+    <figcaption><strong>Kein Entry nach gelaufenem Move</strong> - Die Szene wurde als visuelle Referenz aus dem Videomaterial aufgenommen und im jeweiligen Kapitel eingeordnet.<br><span>Video: 2025-10-27_18-03-41-00.42.27.313-01.25.26.700-seg2.mp4, Zeitpunkt ca. 40:44</span></figcaption>
+  </figure>
+    <ul class="checklist"><li>Kein Entry, wenn die Trigger-Kerze zu groß ist.</li><li>Kein Entry, wenn der Preis weit von EMA/Level entfernt ist.</li><li>Kein Entry nach drei grünen oder roten Impulskerzen ohne Pullback.</li><li>Kein Entry, wenn du nur klickst, weil du den Move verpasst hast.</li><li>Kein Entry direkt in eine erwartete Gegen-Zone hinein.</li></ul></section>
+<section class="chapter"><div class="kicker">Exit</div><h2>Wann du raus musst, auch wenn die Idee noch schön klingt</h2><p>Der Exit ist im Scalping genauso wichtig wie der Entry. Wenn der Markt deine Zone nicht respektiert, wenn der Gegenimpuls stark wird oder wenn der breite Markt dreht, wird geschlossen. Nicht diskutiert.</p>
+    <figure>
+    <img src="assets/screenshots/20-exit.jpg" alt="Exit nach Gegenimpuls">
+    <figcaption><strong>Exit nach Gegenimpuls</strong> - Die Szene behandelt eine Preiszone, an der viel Volumen bzw. Marktentscheidung liegt. Im Buch wird daraus die POC-Regel abgeleitet.<br><span>Video: 2025-06-25_16-02-16.mp4, Zeitpunkt ca. 4:30</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Exit-Grund</th><th>Aktion</th></tr></thead><tbody><tr><td>Level wird klar verloren</td><td>Trade schließen oder Stop ausführen lassen</td></tr><tr><td>POC/EMA gegen dich reclaimt</td><td>Nicht hoffen, raus</td></tr><tr><td>Nasdaq/BTC-Kontext dreht gegen Position</td><td>Risiko reduzieren</td></tr><tr><td>Trade stagniert zu lange</td><td>Zeitstop prüfen</td></tr><tr><td>Tagesziel erreicht</td><td>Nicht weiter erzwingen</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Market Open</div><h2>Timing, Volatilität und die besten Lernfenster</h2><p>Scalping lebt von Bewegung, aber nicht jede Bewegung ist handelbar. Rund um wichtige Opens, Daten oder starke Marktphasen entstehen Chancen. Gleichzeitig steigt dort die Gefahr von Spikes, Slippage und emotionalem Handeln.</p>
+    <figure>
+    <img src="assets/screenshots/17-market-open.jpg" alt="Market Open und Timing">
+    <figcaption><strong>Market Open und Timing</strong> - Die Szene wurde als visuelle Referenz aus dem Videomaterial aufgenommen und im jeweiligen Kapitel eingeordnet.<br><span>Video: 2025-07-31_12-37-05.mp4, Zeitpunkt ca. 4:44</span></figcaption>
+  </figure>
+    <ul class="checklist"><li>Vor dem aktiven Fenster Level vorbereiten.</li><li>Erste Impulse beobachten, nicht sofort hinterher.</li><li>Wenn Volatilität fehlt, keine Gewinne erzwingen.</li><li>Wenn Volatilität extrem ist, Position kleiner.</li><li>Nach dem Trade sofort Review: War es Setup oder Zufall?</li></ul></section>
+<section class="chapter"><div class="kicker">Live-Trade-Protokoll</div><h2>So wird ein Scalp Schritt für Schritt geführt</h2><p>Das folgende Protokoll ist die praktische Zusammenfassung des Videomaterials. Es ist als Ablauf gedacht, den du vor jedem Trade abhaken kannst.</p>
+    <figure>
+    <img src="assets/screenshots/24-live-trade.jpg" alt="Live-Trade Management">
+    <figcaption><strong>Live-Trade Management</strong> - Die Szene behandelt Positionsgröße, Stop und die Frage, wann man mit kleiner Größe arbeitet.<br><span>Video: 2025-07-03_20-06-29.mp4, Zeitpunkt ca. 7:44</span></figcaption>
+  </figure>
+    <table><thead><tr><th>Phase</th><th>Frage</th><th>Wenn Antwort unklar ist</th></tr></thead><tbody><tr><td>Vorbereitung</td><td>Welche Zone will ich handeln?</td><td>Kein Trade</td></tr><tr><td>Bias</td><td>Long, Short oder neutral?</td><td>Kein Trade</td></tr><tr><td>Confirmation</td><td>Welche Reaktion brauche ich?</td><td>Warten</td></tr><tr><td>Entry</td><td>Wo genau löse ich aus?</td><td>Kein Market-Klick</td></tr><tr><td>Stop</td><td>Wo ist die Idee falsch?</td><td>Positionsgröße reduzieren</td></tr><tr><td>TP</td><td>Wo nehme ich Profit?</td><td>Trade nicht eröffnen</td></tr><tr><td>Exit</td><td>Was beendet den Trade sofort?</td><td>Regel formulieren</td></tr><tr><td>Review</td><td>War das ein A-Trade?</td><td>Im Journal markieren</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Setups</div><h2>Die vier Kernsetups aus dem Material</h2><table><thead><tr><th>Setup</th><th>Long</th><th>Short</th><th>Beste Bedingung</th></tr></thead><tbody><tr><td>EMA Bounce</td><td>Pullback an 50 EMA hält</td><td>Retest an EMA wird abgelehnt</td><td>klarer Trend</td></tr><tr><td>Range Edge</td><td>Range Low wird zurückerobert</td><td>Range High wird abgelehnt</td><td>Seitwärtsmarkt</td></tr><tr><td>POC Reclaim/Loss</td><td>POC wird zurückerobert</td><td>POC wird verloren</td><td>Volumen-Entscheidung</td></tr><tr><td>LVN Run</td><td>Akzeptanz über dünner Zone</td><td>Akzeptanz unter dünner Zone</td><td>schneller Momentum-Scalp</td></tr></tbody></table>
+    <p>Alle vier Setups haben denselben Aufbau: vorbereitete Zone, Bestätigung, kleiner Stop, schnelles Management. Sie unterscheiden sich nur darin, welche Zone die Entscheidung liefert.</p>
+    <aside class="callout "><strong>A-Setup</strong><p>Ein A-Setup hat Kontext, Level, Confirmation, Risiko und Management. Fehlt einer dieser fünf Teile, ist es höchstens ein B-Trade und wird kleiner oder gar nicht gehandelt.</p></aside></section>
+<section class="chapter"><div class="kicker">Scalping-Score</div><h2>Wann ein Trade groß genug ist</h2><p>Der Score macht aus Bauchgefühl eine Checkliste. Er zwingt dich, vor dem Entry zu beweisen, warum der Trade gut ist.</p>
+    <table><thead><tr><th>Kriterium</th><th>Punkte</th></tr></thead><tbody><tr><td>15M-Kontext klar</td><td>+2</td></tr><tr><td>3M-Level vorbereitet</td><td>+2</td></tr><tr><td>1M-Trigger sauber</td><td>+2</td></tr><tr><td>POC/EMA/Value/Range bestätigt</td><td>+2</td></tr><tr><td>BTC/Nasdaq-Kontext passt</td><td>+1</td></tr><tr><td>Stop logisch und klein genug</td><td>+1</td></tr><tr><td>TP vor nächster Gegen-Zone</td><td>+1</td></tr><tr><td>Emotion neutral</td><td>+1</td></tr></tbody></table>
+    <table><thead><tr><th>Score</th><th>Entscheidung</th></tr></thead><tbody><tr><td>0-5</td><td>Kein Trade</td></tr><tr><td>6-7</td><td>Nur Demo oder sehr klein</td></tr><tr><td>8-9</td><td>Normaler Trade</td></tr><tr><td>10-12</td><td>A-Trade, normale bis erhöhte Größe nur bei stabiler Statistik</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Trainingsplan</div><h2>30 Tage vom Zuschauen zur Ausführung</h2><table><thead><tr><th>Tage</th><th>Aufgabe</th><th>Ziel</th></tr></thead><tbody><tr><td>1-5</td><td>Nur 15M/3M Struktur markieren</td><td>Trend, Range, POC, EMA sehen</td></tr><tr><td>6-10</td><td>EMA-Scalps historisch nachzeichnen</td><td>Entry/Stop/TP trainieren</td></tr><tr><td>11-15</td><td>POC und Value Area in Videos/Charts markieren</td><td>Volumenzonen verstehen</td></tr><tr><td>16-20</td><td>Nur einen Setup-Typ im Demo handeln</td><td>Regelbruchquote messen</td></tr><tr><td>21-25</td><td>Live mit Kleinstgröße oder weiter Demo</td><td>Execution und Emotion testen</td></tr><tr><td>26-30</td><td>Review, Statistik, Fehlerkatalog</td><td>Nur bestes Setup behalten</td></tr></tbody></table>
+    <aside class="callout warning"><strong>Prüfung</strong><p>Erst nach 50 dokumentierten Trades pro Setup wird die Größe erhöht. Vorher geht es nicht um Geld, sondern um Beweisführung.</p></aside></section>
+<section class="chapter"><div class="kicker">Journal</div><h2>Die Vorlage für jeden Scalping-Trade</h2><table><thead><tr><th>Feld</th><th>Eintrag</th></tr></thead><tbody><tr><td>Datum / Uhrzeit</td><td>Session, Marktphase</td></tr><tr><td>Asset</td><td>BTC, Altcoin, Index-Kontext</td></tr><tr><td>Setup</td><td>EMA, Range, POC, LVN</td></tr><tr><td>Bias</td><td>Long, Short, Neutral</td></tr><tr><td>Entry-Grund</td><td>Level + Confirmation</td></tr><tr><td>Stop-Grund</td><td>Invalidierungszone</td></tr><tr><td>TP-Grund</td><td>EMA, POC, Range-Kante, LVN-Ziel</td></tr><tr><td>Positionsgröße</td><td>Teilposition, normal, Full Size</td></tr><tr><td>Ergebnis</td><td>R, Prozent, Gebühren</td></tr><tr><td>Fehler</td><td>Zu spät, kein Kontext, TP verpasst, Overtrade</td></tr><tr><td>Screenshot</td><td>Vor Entry und nach Exit</td></tr></tbody></table>
+    <p>Das Journal trennt Glück von Können. Ein Gewinn ohne Regel ist kein Beweis. Ein Verlust mit perfekter Regel ist Datenmaterial.</p></section>
+<section class="chapter"><div class="kicker">Master-Regeln</div><h2>Die 25 Regeln, die das ganze Buch zusammenhalten</h2><ul class="checklist"><li>Kein Trade ohne vorbereitete Zone.</li><li>Kein Trade ohne Confirmation.</li><li>Kein Trade in der Range-Mitte.</li><li>Kein Entry nach gelaufenem Move.</li><li>Der 15M-Kontext schlägt den 1M-Impuls.</li><li>Die 50er EMA ist Entscheidungszone, nicht Garantie.</li><li>POC ist Entscheidung, nicht automatischer Entry.</li><li>LVN bedeutet Vorsicht: schnelle Bewegung möglich.</li><li>Imbalance kann geschlossen oder durch Konsolidierung ausgeglichen werden.</li><li>BTC/Nasdaq-Kontext wird vor Altcoin-Scalps geprüft.</li><li>Teilposition bei unklarem Markt.</li><li>Full Size nur bei A-Setup.</li><li>Stop hinter die Invalidierung, nicht an die Hoffnung.</li><li>TP früher nehmen, wenn du spät eingestiegen bist.</li><li>Nach TP nicht sofort emotional reinklicken.</li><li>Gebühren und Slippage sind echte Gegner.</li><li>Wenn Volatilität fehlt, wird nicht gezwungen.</li><li>Wenn Volatilität chaotisch ist, wird kleiner gehandelt.</li><li>Nach zwei Regelbrüchen ist der Tag beendet.</li><li>Lieber kein Trade als ein B-Trade mit großer Größe.</li><li>Der Markt muss deine Zone bestätigen.</li><li>Du handelst Reaktionen, nicht Vorhersagen.</li><li>Wenige Märkte sauber schlagen viele Märkte halb.</li><li>Jeder Trade bekommt einen Screenshot.</li><li>Profitabilität entsteht aus Wiederholung, nicht aus einem perfekten Video.</li></ul></section>
+<section class="chapter"><div class="kicker">Realitätscheck</div><h2>Wie gut Scalping wirklich funktionieren kann</h2><p>Scalping kann funktionieren, aber nicht, weil ein Indikator magisch ist. Es funktioniert nur, wenn mehrere Bedingungen gleichzeitig erfüllt sind: ein liquider Markt, geringe Gebühren, schnelle Ausführung, ein wiederholbarer Vorteil, harte Stopps, saubere Statistik und die Fähigkeit, kleine Gewinne nicht wieder abzugeben.</p>
+    <p>Die Videos zeigen genau diesen Punkt: Der Trader wartet auf konkrete Zonen und Reaktionen. Er handelt weniger, aber an besseren Stellen. Das ist der Unterschied zwischen professionellem Scalping und impulsivem 1-Minuten-Klicken.</p>
+    <aside class="callout online"><strong>Online-Recherche: Daytrading ist riskant und teuer</strong><p>Die SEC warnt, dass Daytrading hohe Verluste verursachen kann, oft unter starkem Stress stattfindet und Kosten wie Kommissionen, Tools und Ausbildung berücksichtigt werden müssen. Für dieses Buch bedeutet das: Ein Setup ist erst gut, wenn es nach Gebühren, Spread und Slippage noch Sinn ergibt.</p><p class="source">Quelle: <a href='https://www.sec.gov/about/reports-publications/investor-publications/day-trading-your-dollars-at-risk'>SEC: Day Trading: Your Dollars at Risk</a></p></aside>
+    <aside class="callout online"><strong>Online-Recherche: Viele Retail-Trader verlieren</strong><p>Die CFTC nennt für Retail-Forex als grobe Realität, dass zwei von drei Retail-Forex-Tradern pro Quartal Geld verlieren. Der exakte Markt ist nicht identisch mit Krypto-Scalping, aber die Lehre ist direkt übertragbar: Hebel, Kosten und falsche Versprechen zerstören kleine Konten schnell.</p><p class="source">Quelle: <a href='https://www.cftc.gov/LearnAndProtect/forexfrauds'>CFTC: Forex Frauds</a></p></aside>
+    <table><thead><tr><th>Was funktionieren kann</th><th>Was meistens nicht funktioniert</th></tr></thead><tbody><tr><td>Warten auf vorbereitete Zonen</td><td>Jeden 1M-Impuls handeln</td></tr><tr><td>Kleine, saubere Stops</td><td>Stop verschieben, weil man recht haben will</td></tr><tr><td>Teilposition bei unklarem Markt</td><td>Full Size in jede Idee</td></tr><tr><td>TP an EMA/POC/Range-Kante</td><td>Immer auf den großen Move hoffen</td></tr><tr><td>50-100 dokumentierte Wiederholungen</td><td>Nach drei Gewinnen Größe erhöhen</td></tr><tr><td>Orderflow nur als Bestätigung</td><td>Footprint ohne Kontext lesen</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Perfektion</div><h2>Was einen perfekten Scalp ausmacht</h2><p>Perfektion im Scalping bedeutet nicht, jedes Top und Bottom zu treffen. Perfektion bedeutet, dass der Trade vor dem Entry so klar ist, dass du danach nur noch deinen Plan ausführst. Ein perfekter Scalp hat fünf Bausteine: Kontext, Zone, Trigger, Risiko und Exit.</p>
+    <table><thead><tr><th>Baustein</th><th>Perfekt</th><th>Nicht perfekt</th></tr></thead><tbody><tr><td>Kontext</td><td>15M/3M zeigen dieselbe Story</td><td>1M sieht gut aus, aber 15M widerspricht</td></tr><tr><td>Zone</td><td>EMA, POC, VAH/VAL, Range-Kante oder LVN</td><td>Irgendwo in der Mitte</td></tr><tr><td>Trigger</td><td>Reclaim, Ablehnung, Wick, Retest, Absorption</td><td>Ich glaube, es steigt jetzt</td></tr><tr><td>Risiko</td><td>Stop hinter Invalidierung, Größe passt</td><td>Stop zu eng, damit Size größer ist</td></tr><tr><td>Exit</td><td>TP und Notausstieg stehen vorher fest</td><td>Ich entscheide dann live</td></tr></tbody></table>
+    <aside class="callout "><strong>Perfektionssatz</strong><p>Ein perfekter Scalp ist nicht der größte Gewinner. Es ist der Trade, den du 100-mal nach derselben Logik wiederholen kannst.</p></aside>
+    <ul class="checklist"><li>Der Entry liegt an einer markierten Zone.</li><li>Die Confirmation ist sichtbar, nicht nur gefühlt.</li><li>Der Stop ist logisch und finanziell klein genug.</li><li>Der TP liegt vor der nächsten Gegen-Zone.</li><li>Du weißt vor dem Entry, wann du sofort raus musst.</li><li>Der Trade ist nach dem Exit screenshot- und journalfähig.</li></ul></section>
+<section class="chapter"><div class="kicker">Profitabilitätsmodell</div><h2>Wie aus Scalps ein positiver Erwartungswert wird</h2><p>Profitabilität entsteht mathematisch aus Erwartungswert. Nicht aus Trefferquote allein. Ein Scalper kann mit hoher Trefferquote verlieren, wenn die wenigen Verlierer zu groß sind. Er kann mit mittlerer Trefferquote gewinnen, wenn Gewinner sauber gemanagt und Verlierer klein gehalten werden.</p>
+    <table><thead><tr><th>Kennzahl</th><th>Bedeutung</th><th>Mindestziel vor Skalierung</th></tr></thead><tbody><tr><td>Winrate</td><td>Wie viele Trades gewinnen?</td><td>Nicht isoliert bewerten</td></tr><tr><td>Average Win</td><td>Durchschnittlicher Gewinn</td><td>größer als Gebühren + Slippage</td></tr><tr><td>Average Loss</td><td>Durchschnittlicher Verlust</td><td>klar begrenzt</td></tr><tr><td>Profit Factor</td><td>Bruttogewinn / Bruttoverlust</td><td>über 1,2 im Forward-Test</td></tr><tr><td>Expectancy</td><td>Durchschnittlicher Gewinn pro Trade</td><td>positiv nach Kosten</td></tr><tr><td>Rule Break Rate</td><td>Regelbruchquote</td><td>unter 5%</td></tr><tr><td>Max Drawdown</td><td>größte Verluststrecke</td><td>psychisch tragbar</td></tr></tbody></table>
+    <p>Formel: <strong>Erwartungswert = Winrate x Durchschnittsgewinn - Verlustquote x Durchschnittsverlust - Kosten.</strong> Wenn dieser Wert über mindestens 100 Trades nicht positiv ist, wird nicht skaliert.</p>
+    <aside class="callout warning"><strong>Scalping-Härte</strong><p>Scalping hat kleine Ziele. Dadurch werden Gebühren, Spread und Slippage überproportional wichtig. Ein Setup, das auf dem Chart schön aussieht, kann nach Kosten wertlos sein.</p></aside></section>
+<section class="chapter"><div class="kicker">Welche Trader so arbeiten</div><h2>Profi-Prinzipien statt Guru-Kopie</h2><p>Dieses Buch kopiert keinen externen Trader. Es ordnet aber die Kurslogik in bekannte professionelle Denkweisen ein: Price Action, Orderflow, Auction Market Theory, Volume Profile und konsequentes Trade-Management.</p>
+    <table><thead><tr><th>Trader/Schule</th><th>Bekannt für</th><th>Übertrag ins Buch</th></tr></thead><tbody><tr><td>Al Brooks / Price Action</td><td>kleine Timeframes, Kerzenlogik, Traps, Scalps</td><td>Entry erst nach Struktur und Signal, nicht nach Wunsch</td></tr><tr><td>Linda Raschke</td><td>kurzfristige Setups, Disziplin, Muster und Timing</td><td>Setups werden trainiert, nicht improvisiert</td></tr><tr><td>Orderflow-Trader / Jigsaw-Schule</td><td>DOM, Tape, Orderflow, Ausführung</td><td>Orderflow als Bestätigung, nicht als alleinige Idee</td></tr><tr><td>Bookmap-/Heatmap-Trader</td><td>Liquidität, Absorption, Heatmap, Orderbuch</td><td>Liquiditätszonen erklären Reaktion und Ziele</td></tr><tr><td>Auction-Market-/Volume-Profile-Trader</td><td>Value, POC, Balance/Imbalance</td><td>Der Markt rotiert um Value oder verlässt Value mit Akzeptanz</td></tr></tbody></table>
+    <aside class="callout online"><strong>Online-Recherche: Bookmap und echte Liquidität</strong><p>Bookmap beschreibt die Heatmap als Darstellung ruhender Orders im Orderbuch. Brighter areas bedeuten höhere passive Liquidität. Für dieses Buch heißt das: Heatmap-Zonen sind keine Garantie, aber sie zeigen, wo Reaktionen, Fakeouts oder Absorption wahrscheinlicher beobachtet werden können.</p><p class="source">Quelle: <a href='https://bookmap.com/learning-center/en/getting-started/liquidity-heatmap/heatmap-overview'>Bookmap Learning Center: Heatmap Overview</a></p></aside>
+    <aside class="callout online"><strong>Online-Recherche: Orderflow als professioneller Trainingsbereich</strong><p>Jigsaw stellt Orderflow als eigenständige Informationsschicht dar und betont Planung, Ausführung und Analytics. Das passt zur Kurslogik: Erst Markt lesen, dann handeln, danach über Daten verbessern.</p><p class="source">Quelle: <a href='https://www.jigsawtrading.com/'>Jigsaw Trading: Order Flow Trading Education</a></p></aside></section>
+<section class="chapter"><div class="kicker">Online-Recherche</div><h2>Was externe Quellen bestätigen und was nicht</h2><p>Die externe Recherche bestätigt nicht, dass irgendein Setup garantiert profitabel ist. Sie bestätigt aber mehrere Bausteine, die im Kursmaterial immer wieder auftauchen: Orderflow zeigt Informationen, die Kerzencharts nicht vollständig zeigen; Volume Profile strukturiert den Markt über gehandelte Volumenbereiche; Hebel und Daytrading sind für Retail-Trader riskant; professionelle Ausführung braucht Training und Daten.</p>
+    <table><thead><tr><th>Kursprinzip</th><th>Externe Bestätigung</th><th>Praktische Konsequenz</th></tr></thead><tbody><tr><td>POC/Value als Entscheidungszone</td><td>Volume-Profile-Quellen definieren POC als volumenstärkstes Preislevel einer Periode</td><td>POC ist Zone für Reaktion, nicht automatischer Entry</td></tr><tr><td>Bookmap/Orderbuch</td><td>Bookmap visualisiert ruhende Liquidität und historische Liquiditätsänderungen</td><td>Liquidität als Ziel, Magnet oder Fakeout-Zone behandeln</td></tr><tr><td>Orderflow/Footprint</td><td>Orderflow-Plattformen nutzen Bid/Ask, DOM, Tape, Heatmap</td><td>Nur als Bestätigung an vorbereiteten Zonen</td></tr><tr><td>Daytrading-Risiko</td><td>SEC/CFTC warnen vor hohen Verlusten und Kosten</td><td>Kleinstgröße, Journal, Gebührenrechnung Pflicht</td></tr><tr><td>Professionelles Training</td><td>Orderflow-Anbieter betonen Übungen und Analytics</td><td>Nicht nur schauen, sondern replayen, markieren, auswerten</td></tr></tbody></table>
+    <aside class="callout online"><strong>Online-Recherche: Volume und Open Interest</strong><p>CME erklärt Volume als Anzahl gehandelter Kontrakte. Für Volume Profile ist das wichtig: Es geht nicht um gezeichnete Linien, sondern um die Verteilung echter Handelsaktivität über Preisbereiche.</p><p class="source">Quelle: <a href='https://www.cmegroup.com/trading/about-volume.html'>CME Group: About Volume</a></p></aside>
+    <aside class="callout online"><strong>Online-Recherche: Leverage kann Verluste vergrößern</strong><p>Die CFTC weist darauf hin, dass gehebelte Transaktionen erhebliche Gewinne, aber auch erhebliche Verluste verursachen können und Verluste je nach Produkt über die Margin hinausgehen können. Für Scalping heißt das: Positionsgröße ist kein Detail, sondern Überlebensbedingung.</p><p class="source">Quelle: <a href='https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/understandcontractobligations.html'>CFTC: Understand Your Contractual Obligations</a></p></aside></section>
+<section class="chapter"><div class="kicker">A-Setups im Detail</div><h2>Vier Setups als ausführbare Playbooks</h2><p>Die erste Version des Buches hat die Setups genannt. Hier sind sie als konkrete Playbooks formuliert. Nutze zuerst nur ein Setup, bis du 50 saubere Beispiele gesammelt hast.</p>
+    <h3>1. EMA Bounce Long</h3>
+    <table><thead><tr><th>Element</th><th>Regel</th></tr></thead><tbody><tr><td>Kontext</td><td>15M nicht bearish, 3M über oder an der 50er EMA</td></tr><tr><td>Zone</td><td>50 EMA oder Cluster aus 50/100/200</td></tr><tr><td>Trigger</td><td>Wick unter EMA, Reclaim, grüne Impulskerze oder höheres Tief</td></tr><tr><td>Entry</td><td>nach Trigger-Schluss oder kleinem Retest</td></tr><tr><td>Stop</td><td>unter Wick/Retest-Tief</td></tr><tr><td>TP</td><td>nächstes lokales Hoch, POC oder Range High</td></tr><tr><td>Verbot</td><td>wenn der Preis schon weit von der EMA entfernt ist</td></tr></tbody></table>
+    <h3>2. EMA Rejection Short</h3>
+    <table><thead><tr><th>Element</th><th>Regel</th></tr></thead><tbody><tr><td>Kontext</td><td>15M neutral bis bearish, Kurs unter 50 EMA</td></tr><tr><td>Zone</td><td>Rücklauf von unten an 50/100 EMA</td></tr><tr><td>Trigger</td><td>Ablehnung, roter Impuls, tieferes Hoch</td></tr><tr><td>Entry</td><td>nach Rejection oder Break des kleinen 1M-Lows</td></tr><tr><td>Stop</td><td>über Rejection-Hoch</td></tr><tr><td>TP</td><td>Range Low, VAL oder nächste LVN-Kante</td></tr><tr><td>Verbot</td><td>wenn direkt darunter starker Support/POC liegt</td></tr></tbody></table>
+    <h3>3. POC Reclaim Long</h3>
+    <table><thead><tr><th>Element</th><th>Regel</th></tr></thead><tbody><tr><td>Kontext</td><td>POC wurde verloren, aber Preis kommt zurück</td></tr><tr><td>Zone</td><td>POC plus Range-/EMA-Konfluenz</td></tr><tr><td>Trigger</td><td>Schluss zurück über POC, Retest hält</td></tr><tr><td>Entry</td><td>Retest-Hold oder Micro-Strukturbruch</td></tr><tr><td>Stop</td><td>unter Retest oder unter POC-Fehlschlag</td></tr><tr><td>TP</td><td>VAH, Range High oder offene Imbalance</td></tr><tr><td>Verbot</td><td>wenn Reclaim nur ein Docht ohne Akzeptanz ist</td></tr></tbody></table>
+    <h3>4. LVN Momentum Run</h3>
+    <table><thead><tr><th>Element</th><th>Regel</th></tr></thead><tbody><tr><td>Kontext</td><td>Preis akzeptiert über/unter einer dünnen Volumenzone</td></tr><tr><td>Zone</td><td>LVN-Kante</td></tr><tr><td>Trigger</td><td>Akzeptanz in Richtung der dünnen Zone</td></tr><tr><td>Entry</td><td>nach Break und kleinem Retest</td></tr><tr><td>Stop</td><td>zurück hinter LVN-Kante</td></tr><tr><td>TP</td><td>nächste High-Volume-Zone oder Value-Kante</td></tr><tr><td>Verbot</td><td>wenn direkt vor Entry schon der ganze LVN-Lauf passiert ist</td></tr></tbody></table></section>
+<section class="chapter"><div class="kicker">Fehlerdiagnose</div><h2>Warum ein Setup trotz richtiger Idee scheitert</h2><p>Viele Trades scheitern nicht, weil die Analyse komplett falsch war, sondern weil ein Detail schlecht umgesetzt wurde. Dieses Kapitel ist für die Nacharbeit nach jedem Verlust.</p>
+    <table><thead><tr><th>Fehler</th><th>Symptom</th><th>Korrektur</th></tr></thead><tbody><tr><td>Zu später Entry</td><td>Preis weit weg von EMA/Level</td><td>Nur Retest oder neuen Aufbau handeln</td></tr><tr><td>Zu enger Stop</td><td>Richtige Idee, aber Stop wird abgeholt</td><td>Stop hinter Invalidierung, Size reduzieren</td></tr><tr><td>Falsches Marktregime</td><td>Trendsetup in Range oder Range-Setup im Trend</td><td>Vor jedem Trade Regime markieren</td></tr><tr><td>POC falsch genutzt</td><td>POC als Entry statt Zone gehandelt</td><td>Reaktion/Reclaim abwarten</td></tr><tr><td>Orderflow überbewertet</td><td>Footprint-Signal ohne Chart-Kontext</td><td>Orderflow nur letzter Filter</td></tr><tr><td>TP verpasst</td><td>Gewinn dreht in Verlust</td><td>TP an nächster Gegen-Zone vorab festlegen</td></tr><tr><td>Korrelation ignoriert</td><td>Nasdaq/BTC dreht gegen Position</td><td>Kontext vor Entry prüfen</td></tr><tr><td>Overtrading nach Gewinn</td><td>Profit wird zurückgegeben</td><td>Nach TP Pause und Tageslimit</td></tr></tbody></table>
+    <aside class="callout "><strong>Verlustanalyse</strong><p>Ein Verlust wird nur dann als Fehler bewertet, wenn eine Regel gebrochen wurde. Ein regelkonformer Verlust ist normaler Geschäftsbetrieb.</p></aside></section>
+<section class="chapter"><div class="kicker">Was noch gemacht werden muss</div><h2>Vom Buch zum eigenen System</h2><p>Dieses Buch kann dir Regeln geben, aber es kann dir nicht die 300 Wiederholungen abnehmen, die aus Regeln Können machen. Der nächste Schritt ist deshalb ein persönliches Scalping-Labor.</p>
+    <table><thead><tr><th>Aufgabe</th><th>Umsetzung</th><th>Ergebnis</th></tr></thead><tbody><tr><td>Video-Replay</td><td>Pro Tag 1 Video, nur Setups markieren</td><td>Auge für Zonen</td></tr><tr><td>Screenshot-Datenbank</td><td>Vorher/Nachher-Bilder speichern</td><td>Mustererkennung</td></tr><tr><td>Setup-Statistik</td><td>Je Setup 50 Beispiele</td><td>Erwartungswert je Setup</td></tr><tr><td>Gebührenrechnung</td><td>Spread, Fee, Slippage pro Trade erfassen</td><td>Realistische Profitabilität</td></tr><tr><td>Market-Replay</td><td>1M/3M ohne Zukunftsdaten üben</td><td>Echte Entscheidung trainieren</td></tr><tr><td>Live-Kleinstgröße</td><td>erst nach positivem Forward-Test</td><td>Execution testen</td></tr><tr><td>Monatsreview</td><td>Top 10 Gewinner/Verlierer analysieren</td><td>Regeln verbessern</td></tr></tbody></table>
+    <ul class="checklist"><li>Ein Setup auswählen.</li><li>50 historische Beispiele sammeln.</li><li>20 Replay-Trades ohne Echtgeld machen.</li><li>20 Kleinstgrößen-Trades dokumentieren.</li><li>Nur skalieren, wenn Regelbruchquote unter 5% bleibt.</li><li>Jeden Monat schlechte Regeln streichen und gute Regeln präzisieren.</li></ul></section>
+<section class="chapter"><div class="kicker">Perfektions-Checkliste</div><h2>Die letzte Seite vor dem echten Trade</h2><p>Diese Checkliste ist bewusst streng. Ein Trade, der sie nicht besteht, darf nicht mit normaler Größe gehandelt werden.</p>
+    <table><thead><tr><th>Check</th><th>Ja/Nein</th></tr></thead><tbody><tr><td>Ich kenne die Marktphase: Trend, Range, Chop oder News.</td><td> </td></tr><tr><td>Ich weiß, ob BTC/Nasdaq-Kontext hilft oder stört.</td><td> </td></tr><tr><td>Ich handele an EMA, POC, VAH/VAL, LVN oder Range-Kante.</td><td> </td></tr><tr><td>Ich habe eine echte Confirmation, nicht nur eine Vermutung.</td><td> </td></tr><tr><td>Mein Stop liegt hinter der Invalidierung.</td><td> </td></tr><tr><td>Meine Positionsgröße passt zum Stop.</td><td> </td></tr><tr><td>Mein TP liegt vor der nächsten Gegen-Zone.</td><td> </td></tr><tr><td>Ich weiß, wann ich sofort aussteige.</td><td> </td></tr><tr><td>Ich habe keinen FOMO-Grund für den Entry.</td><td> </td></tr><tr><td>Ich kann den Trade in einem Satz erklären.</td><td> </td></tr></tbody></table>
+    <aside class="callout "><strong>Ein-Satz-Regel</strong><p>Ich trade [Asset] [long/short], weil [Kontext], an [Zone], nach [Confirmation], mit Stop bei [Invalidierung] und TP bei [Zielzone]. Wenn dieser Satz nicht sauber ist, ist der Trade nicht sauber.</p></aside></section>
+<section class="chapter"><div class="kicker">Videoverzeichnis</div><h2>Welche Dateien in die Auswertung eingeflossen sind</h2><p>Die folgenden Screenshots und Kapitel wurden aus dem lokalen Videomaterial und den fertigen Transkripten abgeleitet. Die Transkripte wurden nicht 1:1 übernommen, sondern in eigene Lernregeln umgebaut.</p>
+    <table><thead><tr><th>Kennzahl</th><th>Wert</th></tr></thead><tbody><tr><td>Videos/Transkripte</td><td>105</td></tr><tr><td>Screenshots im Buch</td><td>24</td></tr><tr><td>Häufige Konzepte</td><td>EMA / Moving Average (3188)<br>Point of Control (580)<br>Value Area (200)<br>Low Volume Node (28)<br>Imbalance / Gap (39)<br>Long Confirmation (7)<br>Short Confirmation (17)<br>Footprint / Orderflow (101)<br>Bookmap / Orderbuch (18)<br>Nasdaq / S&amp;P / BTC (258)<br>Risk / Position (893)</td></tr></tbody></table>
+    <table><thead><tr><th>Screenshot</th><th>Video</th><th>Zeit</th></tr></thead><tbody><tr><td>Range und Marktstruktur</td><td>2025-10-29_14-11-11.mp4</td><td>4:44</td></tr><tr><td>EMA-Grundsetup</td><td>2025-07-31_12-05-08.mp4</td><td>4:44</td></tr><tr><td>Durchbruch durch die 50er EMA</td><td>2024-11-22_11-35-101.mp4</td><td>22:44</td></tr><tr><td>Retest nach EMA-Bruch</td><td>2025-07-31_12-05-08.mp4</td><td>25:44</td></tr><tr><td>Point of Control als Entscheidungszone</td><td>2025-06-26_18-52-30.mp4</td><td>19:44</td></tr><tr><td>Value Area High/Low</td><td>2025-08-05_12-50-51.mp4</td><td>16:44</td></tr><tr><td>Low Volume Node</td><td>2025-12-09_16-10-07.mp4</td><td>1:44</td></tr><tr><td>Imbalance und Gap Close</td><td>2026-02-03_15-05-14-00.25.27.405-00.55.45.100-seg2.mp4</td><td>1:44</td></tr><tr><td>Long Confirmation</td><td>2025-01-07_08-14-53.mp4</td><td>1:44</td></tr><tr><td>Short Confirmation</td><td>2024-12-11_07-33-08.mp4</td><td>10:44</td></tr><tr><td>Footprint / Orderflow</td><td>2026-02-10_15-30-04.mp4</td><td>19:44</td></tr><tr><td>Bookmap / Liquidität</td><td>2025-10-06_19-05-43.mp4</td><td>4:44</td></tr><tr><td>BTC im Kontext Nasdaq/S&amp;P</td><td>2026-01-27_16-00-48.mp4</td><td>34:44</td></tr><tr><td>Teilposition und Stop-Management</td><td>2025-11-10_17-50-54.mp4</td><td>19:44</td></tr><tr><td>Take Profit statt Hoffnung</td><td>2025-07-03_19-04-06.mp4</td><td>58:44</td></tr><tr><td>Altcoins selektiv handeln</td><td>altcoin_talk_med_qual.mp4</td><td>61:44</td></tr><tr><td>Market Open und Timing</td><td>2025-07-31_12-37-05.mp4</td><td>4:44</td></tr><tr><td>Range-Break und Fortsetzung</td><td>2025-06-26_18-22-30.mp4</td><td>10:44</td></tr><tr><td>Kein Entry nach gelaufenem Move</td><td>2025-10-27_18-03-41-00.42.27.313-01.25.26.700-seg2.mp4</td><td>40:44</td></tr><tr><td>Exit nach Gegenimpuls</td><td>2025-06-25_16-02-16.mp4</td><td>4:30</td></tr><tr><td>Fix Volume Profile</td><td>2026-01-20_16-45-23.mp4</td><td>10:44</td></tr><tr><td>Absorption</td><td>2026-02-17_15-09-11-00.23.16.502-00.46.23.000-seg2.mp4</td><td>4:44</td></tr><tr><td>Vorab-Plan im Chart</td><td>2025-04-08_07-11-191.mp4</td><td>16:44</td></tr><tr><td>Live-Trade Management</td><td>2025-07-03_20-06-29.mp4</td><td>7:44</td></tr></tbody></table></section>
+    <div class="footer">Dieses Buch ist eine Lernunterlage für den Eigengebrauch. Es ist keine Finanzberatung und kein Gewinnversprechen. Hebelprodukte, Krypto- und Derivatehandel können zum Totalverlust führen. Jede Regel muss im Demo-/Kleinstgrößenmodus getestet und dokumentiert werden, bevor echtes Risiko erhöht wird.</div>
+  </main>
+</body>
+</html>
