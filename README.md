@@ -67,6 +67,12 @@ npx wrangler deploy
 
 Danach die Worker-URL im Frontend als `VITE_INVOICE_API_URL` setzen oder direkt im Rechnungsbereich der Webseite speichern.
 
+Aktuelle Worker-URL:
+
+```text
+https://myweb-receipt-scanner.philipp-myweb.workers.dev
+```
+
 ## Projektgedächtnis
 
 Wichtige Hosting- und Wiederaufbau-Infos stehen in `PROJECT_MEMORY.md`.

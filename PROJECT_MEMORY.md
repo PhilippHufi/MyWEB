@@ -58,6 +58,8 @@ Diese Variablen muessen fuer den vollen Funktionsumfang gesetzt sein:
 - Wichtige Produktregel: Bestehende Bereiche und Funktionen der alten Webseite duerfen nicht geloescht oder ersetzt werden, ohne Philipp vorher klar zu fragen. Neue Funktionen werden bevorzugt ergaenzt oder behutsam in bestehende Bereiche integriert.
 - Nach dem Life-Dashboard-Umbau wurde die alte Webseite wiederhergestellt und der neue Bereich als eigener Navigationspunkt `Life` integriert.
 - Der Rechnungsbereich wurde bewusst ersetzt: neue Rechnungen laufen ueber Browser-OCR mit Tesseract.js und einen Cloudflare Worker in `cloudflare-worker/`. Die Rechnung enthaelt `id`, `date`, `total`, `rawText`, `createdAt` sowie das Foto als `imageData`, damit es in der Webseite wieder geoeffnet werden kann.
+- Receipt Worker URL: `https://myweb-receipt-scanner.philipp-myweb.workers.dev`. Railway Variable: `VITE_INVOICE_API_URL`.
+- Navigation `Buchhaltung`: enthaelt Rechnungen und Angebote. Rechnungen koennen automatisch per OCR oder manuell erfasst werden. Angebote koennen mit Datei und Kategorie abgelegt werden. Der Offline-HTML-Export erzeugt eine eigenstaendige HTML-Datei mit eingebetteten Dateien/Bildern.
 - Es gibt einen Navigationspunkt `Buecher`. Das Scalping-Buch aus dem analysierten Videomaterial liegt als statische HTML-Seite unter `frontend/public/books/scalping-preview-book.html`, inklusive PDF und Screenshot-Assets.
 
 ## Wiederaufbau

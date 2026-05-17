@@ -1,8 +1,10 @@
 name = "myweb-receipt-scanner"
 main = "src/worker.js"
 compatibility_date = "2026-05-17"
+workers_dev = true
+preview_urls = true
 
 [[kv_namespaces]]
 binding = "INVOICES"
-id = "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+id = "a22ddbe5d50843e5a5fc2de04084df29"
+preview_id = "df01f1893a524d5b8de9d3308f6e98a3"

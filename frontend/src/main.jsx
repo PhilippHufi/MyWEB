@@ -40,7 +40,7 @@ const API = import.meta.env.VITE_API_URL || '/api';
 const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'tasks', label: 'To-do', icon: CheckSquare },
-  { id: 'invoices', label: 'Rechnungen', icon: ReceiptText },
+  { id: 'invoices', label: 'Buchhaltung', icon: ReceiptText },
   { id: 'media', label: 'Filme', icon: Film },
   { id: 'news', label: 'News', icon: Newspaper },
   { id: 'travel', label: 'Urlaub', icon: Plane },
@@ -572,19 +572,31 @@ function Shopping({ api }) {
   );
 }
 
-function Invoices() {
+function BookkeepingPage() {
   const [items, setItems] = useState([]);
-  const [file, setFile] = useState(null);
+  const [section, setSection] = useState('invoice');
+  const [invoiceMode, setInvoiceMode] = useState('ocr');
+  const [scanFile, setScanFile] = useState(null);
+  const [manualFile, setManualFile] = useState(null);
+  const [offerFile, setOfferFile] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [ocrProgress, setOcrProgress] = useState(0);
   const [result, setResult] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [endpoint, setEndpoint] = useState(() => (
     import.meta.env.VITE_INVOICE_API_URL || localStorage.getItem('pd:invoice-api-url') || ''
   ));
+  const [manualForm, setManualForm] = useState({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
+  const [offerForm, setOfferForm] = useState({ title: '', partner: '', category: '', amount: '', offerDate: new Date().toISOString().slice(0, 10), validUntil: '', notes: '' });
 
   const normalizedEndpoint = endpoint.replace(/\/$/, '');
+  const categories = useMemo(() => {
+    const base = ['Allgemein', 'Haushalt', 'Auto', 'Arbeit', 'Versicherung', 'Gesundheit', 'Technik', 'Trading', 'Sonstiges'];
+    const fromItems = items.map((item) => item.category).filter(Boolean);
+    return Array.from(new Set([...base, ...fromItems]));
+  }, [items]);
+  const visibleItems = items.filter((item) => (item.recordType || 'invoice') === section);
 
   async function load() {
     if (!normalizedEndpoint) {
@@ -607,55 +619,161 @@ function Invoices() {
     setEndpoint(clean);
   }
 
+  async function saveRecord(record) {
+    if (!normalizedEndpoint) throw new Error('Cloudflare Worker Endpoint fehlt.');
+    const response = await fetch(normalizedEndpoint + '/invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    if (!response.ok) throw new Error(await response.text());
+    setResult(record);
+    setStatus(record.recordType === 'offer' ? 'Angebot gespeichert' : 'Rechnung gespeichert');
+    await load();
+  }
+
   async function scanInvoice(event) {
     event.preventDefault();
-    if (!file || !normalizedEndpoint) return;
-
+    if (!scanFile || !normalizedEndpoint) return;
     setError('');
-    setStatus('OCR l\u00e4uft...');
+    setStatus('OCR laeuft...');
     setOcrProgress(0);
     setResult(null);
 
     try {
-      const imageData = await fileToDataUrl(file);
+      const imageData = await fileToDataUrl(scanFile);
       const ocr = await Tesseract.recognize(imageData, 'deu+eng', {
         logger: (message) => {
-          if (message.status === 'recognizing text') {
-            setOcrProgress(Math.round(message.progress * 100));
-          }
+          if (message.status === 'recognizing text') setOcrProgress(Math.round(message.progress * 100));
         }
       });
-
       const rawText = ocr.data.text || '';
-      const invoice = {
+      await saveRecord({
         id: crypto.randomUUID(),
+        recordType: 'invoice',
+        entryMode: 'ocr',
+        title: 'Gescannte Rechnung',
+        merchant: extractInvoiceMerchant(rawText),
+        category: 'Allgemein',
         date: extractInvoiceDate(rawText),
         total: extractInvoiceTotal(rawText),
+        notes: '',
         rawText,
         imageData,
-        imageName: file.name,
-        imageType: file.type || 'image/jpeg',
+        fileData: imageData,
+        fileName: scanFile.name,
+        fileType: scanFile.type || 'image/jpeg',
         createdAt: new Date().toISOString()
-      };
-
-      setResult(invoice);
-      setStatus('Speichere Rechnung...');
-
-      const response = await fetch(normalizedEndpoint + '/invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invoice)
       });
-      if (!response.ok) throw new Error(await response.text());
-
-      setFile(null);
-      setStatus('Rechnung gespeichert');
+      setScanFile(null);
       setOcrProgress(100);
-      await load();
     } catch (err) {
       setStatus('');
       setError(err.message || 'Rechnung konnte nicht verarbeitet werden.');
     }
+  }
+
+  async function saveManualInvoice(event) {
+    event.preventDefault();
+    if (!normalizedEndpoint) return;
+    setError('');
+    setStatus('Speichere manuelle Rechnung...');
+    try {
+      const fileData = manualFile ? await fileToDataUrl(manualFile) : '';
+      const record = {
+        id: crypto.randomUUID(),
+        recordType: 'invoice',
+        entryMode: 'manual',
+        title: manualForm.merchant || 'Manuelle Rechnung',
+        merchant: manualForm.merchant,
+        category: manualForm.category || 'Allgemein',
+        date: manualForm.invoiceDate || null,
+        total: manualForm.amount ? manualForm.amount + ' EUR' : null,
+        notes: manualForm.notes,
+        rawText: ['Manuelle Rechnung', manualForm.merchant, manualForm.category, manualForm.amount, manualForm.invoiceDate, manualForm.notes].filter(Boolean).join('\n'),
+        imageData: manualFile?.type?.startsWith('image/') ? fileData : '',
+        fileData,
+        fileName: manualFile?.name || '',
+        fileType: manualFile?.type || '',
+        createdAt: new Date().toISOString()
+      };
+      await saveRecord(record);
+      setManualForm({ merchant: '', category: '', amount: '', invoiceDate: new Date().toISOString().slice(0, 10), notes: '' });
+      setManualFile(null);
+    } catch (err) {
+      setStatus('');
+      setError(err.message || 'Manuelle Rechnung konnte nicht gespeichert werden.');
+    }
+  }
+
+  async function saveOffer(event) {
+    event.preventDefault();
+    if (!normalizedEndpoint) return;
+    setError('');
+    setStatus('Speichere Angebot...');
+    try {
+      const fileData = offerFile ? await fileToDataUrl(offerFile) : '';
+      const record = {
+        id: crypto.randomUUID(),
+        recordType: 'offer',
+        entryMode: 'manual',
+        title: offerForm.title || offerForm.partner || 'Angebot',
+        merchant: offerForm.partner,
+        category: offerForm.category || 'Allgemein',
+        date: offerForm.offerDate || null,
+        validUntil: offerForm.validUntil || null,
+        total: offerForm.amount ? offerForm.amount + ' EUR' : null,
+        notes: offerForm.notes,
+        rawText: ['Angebot', offerForm.title, offerForm.partner, offerForm.category, offerForm.amount, offerForm.offerDate, offerForm.validUntil, offerForm.notes].filter(Boolean).join('\n'),
+        imageData: offerFile?.type?.startsWith('image/') ? fileData : '',
+        fileData,
+        fileName: offerFile?.name || '',
+        fileType: offerFile?.type || '',
+        createdAt: new Date().toISOString()
+      };
+      await saveRecord(record);
+      setOfferForm({ title: '', partner: '', category: '', amount: '', offerDate: new Date().toISOString().slice(0, 10), validUntil: '', notes: '' });
+      setOfferFile(null);
+    } catch (err) {
+      setStatus('');
+      setError(err.message || 'Angebot konnte nicht gespeichert werden.');
+    }
+  }
+
+  async function updateCategory(item, category) {
+    if (!normalizedEndpoint) return;
+    const response = await fetch(normalizedEndpoint + '/invoice/' + encodeURIComponent(item.id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    await load();
+  }
+
+  async function removeRecord(item) {
+    if (!window.confirm((item.recordType === 'offer' ? 'Angebot' : 'Rechnung') + ' wirklich loeschen?')) return;
+    const response = await fetch(normalizedEndpoint + '/invoice/' + encodeURIComponent(item.id), { method: 'DELETE' });
+    if (!response.ok) throw new Error(await response.text());
+    await load();
+  }
+
+  function exportOfflineHtml() {
+    const html = buildBookkeepingExportHtml(items);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'buchhaltung-export-' + new Date().toISOString().slice(0, 10) + '.html';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function openStoredFile(item) {
+    const data = item.fileData || item.imageData;
+    if (!data) return;
+    if ((item.fileType || '').startsWith('image/')) setSelectedFile({ data, title: item.fileName || item.title || 'Datei' });
+    else window.open(data, '_blank', 'noopener,noreferrer');
   }
 
   return (
@@ -663,76 +781,125 @@ function Invoices() {
       <Card>
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Receipt Scanner</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Foto aufnehmen, OCR im Browser ausfuehren und die Rechnung in Cloudflare KV speichern.
-            </p>
+            <h2 className="text-lg font-semibold">Buchhaltung</h2>
+            <p className="mt-1 text-sm text-zinc-500">Rechnungen automatisch scannen, manuell erfassen oder Angebote mit Kategorien ablegen.</p>
           </div>
-          <Button type="button" onClick={() => load().catch((err) => setError(err.message))}>Aktualisieren</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={exportOfflineHtml}><Download className="h-4 w-4" />Offline HTML</Button>
+            <Button type="button" className="bg-zinc-700" onClick={() => load().catch((err) => setError(err.message))}>Aktualisieren</Button>
+          </div>
         </div>
 
         <InvoiceEndpointSetup value={endpoint} onSave={saveEndpoint} />
 
-        <form onSubmit={scanInvoice} className="mt-4 grid gap-3">
-          <input
-            className="input"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-          />
-          <Button disabled={!file || !normalizedEndpoint}>
-            <ReceiptText className="h-4 w-4" />Rechnung scannen und speichern
-          </Button>
-        </form>
-
-        {(status || error) && (
-          <div className="mt-4 rounded-md border border-white/10 bg-zinc-950/40 p-3 text-sm">
-            {status && <div className="font-medium text-cyan-200">{status}</div>}
-            {status === 'OCR l\u00e4uft...' && (
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800">
-                <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: ocrProgress + '%' }} />
-              </div>
-            )}
-            {error && <div className="text-red-300">{error}</div>}
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-4">
-            <h3 className="mb-2 text-sm font-semibold text-zinc-300">Erkanntes JSON</h3>
-            <pre className="max-h-80 overflow-auto rounded-md bg-black/60 p-3 text-xs text-cyan-100">
-              {JSON.stringify(stripLargeInvoiceImage(result), null, 2)}
-            </pre>
-          </div>
-        )}
+        <div className="mt-4 grid gap-3 md:grid-cols-[220px_220px_1fr]">
+          <label className="text-sm">
+            <span className="mb-1 block text-zinc-500">Bereich</span>
+            <select className="input" value={section} onChange={(event) => setSection(event.target.value)}>
+              <option value="invoice">Rechnungen</option>
+              <option value="offer">Angebote</option>
+            </select>
+          </label>
+          {section === 'invoice' && (
+            <label className="text-sm">
+              <span className="mb-1 block text-zinc-500">Eingabe</span>
+              <select className="input" value={invoiceMode} onChange={(event) => setInvoiceMode(event.target.value)}>
+                <option value="ocr">Automatisch scannen</option>
+                <option value="manual">Manuell erfassen</option>
+              </select>
+            </label>
+          )}
+        </div>
       </Card>
 
+      {section === 'invoice' && invoiceMode === 'ocr' && (
+        <Card>
+          <h3 className="mb-3 font-semibold">Rechnung automatisch scannen</h3>
+          <form onSubmit={scanInvoice} className="grid gap-3">
+            <input className="input" type="file" accept="image/*" capture="environment" onChange={(event) => setScanFile(event.target.files?.[0] || null)} />
+            <Button disabled={!scanFile || !normalizedEndpoint}><ReceiptText className="h-4 w-4" />Rechnung scannen und speichern</Button>
+          </form>
+        </Card>
+      )}
+
+      {section === 'invoice' && invoiceMode === 'manual' && (
+        <Card>
+          <h3 className="mb-3 font-semibold">Rechnung manuell erfassen</h3>
+          <form onSubmit={saveManualInvoice} className="grid gap-3 md:grid-cols-2">
+            <TextInput value={manualForm.merchant} onChange={(event) => setManualForm({ ...manualForm, merchant: event.target.value })} placeholder="Geschaeft / Firma" />
+            <TextInput value={manualForm.category} onChange={(event) => setManualForm({ ...manualForm, category: event.target.value })} placeholder="Kategorie" />
+            <TextInput value={manualForm.amount} onChange={(event) => setManualForm({ ...manualForm, amount: event.target.value })} type="number" step="0.01" placeholder="Betrag" />
+            <TextInput value={manualForm.invoiceDate} onChange={(event) => setManualForm({ ...manualForm, invoiceDate: event.target.value })} type="date" />
+            <TextInput value={manualForm.notes} onChange={(event) => setManualForm({ ...manualForm, notes: event.target.value })} placeholder="Notiz" />
+            <input className="input" type="file" accept="image/*,application/pdf" onChange={(event) => setManualFile(event.target.files?.[0] || null)} />
+            <Button className="md:col-span-2" disabled={!normalizedEndpoint || !manualForm.merchant}><Plus className="h-4 w-4" />Manuell speichern</Button>
+          </form>
+        </Card>
+      )}
+
+      {section === 'offer' && (
+        <Card>
+          <h3 className="mb-3 font-semibold">Angebot ablegen</h3>
+          <form onSubmit={saveOffer} className="grid gap-3 md:grid-cols-2">
+            <TextInput value={offerForm.title} onChange={(event) => setOfferForm({ ...offerForm, title: event.target.value })} placeholder="Angebotstitel" />
+            <TextInput value={offerForm.partner} onChange={(event) => setOfferForm({ ...offerForm, partner: event.target.value })} placeholder="Firma / Anbieter" />
+            <TextInput value={offerForm.category} onChange={(event) => setOfferForm({ ...offerForm, category: event.target.value })} placeholder="Kategorie" />
+            <TextInput value={offerForm.amount} onChange={(event) => setOfferForm({ ...offerForm, amount: event.target.value })} type="number" step="0.01" placeholder="Betrag optional" />
+            <TextInput value={offerForm.offerDate} onChange={(event) => setOfferForm({ ...offerForm, offerDate: event.target.value })} type="date" />
+            <TextInput value={offerForm.validUntil} onChange={(event) => setOfferForm({ ...offerForm, validUntil: event.target.value })} type="date" />
+            <TextInput value={offerForm.notes} onChange={(event) => setOfferForm({ ...offerForm, notes: event.target.value })} placeholder="Notiz" />
+            <input className="input" type="file" accept="image/*,application/pdf" onChange={(event) => setOfferFile(event.target.files?.[0] || null)} />
+            <Button className="md:col-span-2" disabled={!normalizedEndpoint || !offerForm.title}><Plus className="h-4 w-4" />Angebot speichern</Button>
+          </form>
+        </Card>
+      )}
+
+      {(status || error) && (
+        <Card>
+          {status && <div className="font-medium text-cyan-300">{status}</div>}
+          {status === 'OCR laeuft...' && <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: ocrProgress + '%' }} /></div>}
+          {error && <div className="text-sm text-red-300">{error}</div>}
+        </Card>
+      )}
+
       <Card>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-semibold">Gespeicherte Rechnungen</h3>
-          <span className="text-xs text-zinc-500">{items.length} Eintraege</span>
+        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <h3 className="font-semibold">{section === 'offer' ? 'Gespeicherte Angebote' : 'Gespeicherte Rechnungen'}</h3>
+          <span className="text-xs text-zinc-500">{visibleItems.length} Eintraege</span>
         </div>
         <div className="space-y-2">
-          {items.map((item) => (
-            <div key={item.id} className="flex flex-col gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 md:flex-row md:items-center md:justify-between">
+          {visibleItems.map((item) => (
+            <div key={item.id} className="grid gap-3 rounded-md bg-zinc-100 p-3 text-sm dark:bg-zinc-800 lg:grid-cols-[1fr_190px_auto] lg:items-center">
               <div>
-                <div className="font-medium">{item.date || 'Datum unbekannt'}{item.total ? ' - ' + item.total : ''}</div>
-                <div className="text-zinc-500">{new Date(item.createdAt).toLocaleString('de-AT')}{item.imageName ? ' - ' + item.imageName : ''}</div>
+                <div className="font-medium">{item.title || item.merchant || (item.recordType === 'offer' ? 'Angebot' : 'Rechnung')}</div>
+                <div className="text-zinc-500">{item.date || 'Datum unbekannt'}{item.total ? ' - ' + item.total : ''}{item.merchant ? ' - ' + item.merchant : ''}</div>
+                {item.validUntil && <div className="text-xs text-zinc-500">Gueltig bis: {item.validUntil}</div>}
+                {item.notes && <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{item.notes}</div>}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {item.imageData && <Button type="button" onClick={() => setSelectedImage(item.imageData)}>Bild oeffnen</Button>}
-                <Button type="button" onClick={() => setResult(item)}>JSON</Button>
+              <select className="input" value={item.category || 'Allgemein'} onChange={(event) => updateCategory(item, event.target.value).catch((err) => setError(err.message))}>
+                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                {(item.fileData || item.imageData) && <Button type="button" onClick={() => openStoredFile(item)}>Datei oeffnen</Button>}
+                <Button type="button" className="bg-zinc-700" onClick={() => setResult(item)}>JSON</Button>
+                <button type="button" className="icon-btn" onClick={() => removeRecord(item).catch((err) => setError(err.message))} aria-label="Loeschen"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           ))}
-          {!items.length && <p className="text-sm text-zinc-500">Noch keine gescannten Rechnungen gespeichert.</p>}
+          {!visibleItems.length && <p className="text-sm text-zinc-500">Noch keine Eintraege in diesem Bereich.</p>}
         </div>
       </Card>
 
-      {selectedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setSelectedImage(null)}>
-          <img src={selectedImage} alt="Gespeicherte Rechnung" className="max-h-full max-w-full rounded-md object-contain shadow-2xl" />
+      {result && (
+        <Card>
+          <h3 className="mb-2 text-sm font-semibold text-zinc-300">Datensatz JSON</h3>
+          <pre className="max-h-80 overflow-auto rounded-md bg-black/60 p-3 text-xs text-cyan-100">{JSON.stringify(stripLargeBookkeepingFile(result), null, 2)}</pre>
+        </Card>
+      )}
+
+      {selectedFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setSelectedFile(null)}>
+          <img src={selectedFile.data} alt={selectedFile.title} className="max-h-full max-w-full rounded-md object-contain shadow-2xl" />
         </div>
       )}
     </div>
@@ -749,9 +916,7 @@ function InvoiceEndpointSetup({ value, onSave }) {
   return (
     <div className="rounded-md border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
       <div className="font-medium">Cloudflare Worker Endpoint</div>
-      <p className="mt-1 text-amber-100/80">
-        Trage hier die Worker-URL ein oder setze VITE_INVOICE_API_URL im Hosting. Ohne Endpoint kann nichts gespeichert werden.
-      </p>
+      <p className="mt-1 text-amber-100/80">Trage hier die Worker-URL ein oder setze VITE_INVOICE_API_URL im Hosting. Ohne Endpoint kann nichts gespeichert werden.</p>
       <div className="mt-3 flex flex-col gap-2 md:flex-row">
         <TextInput value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="https://myweb-receipt-scanner.dein-name.workers.dev" />
         <Button type="button" onClick={() => onSave(draft)}>Speichern</Button>
@@ -784,12 +949,144 @@ function extractInvoiceTotal(text) {
   return allMatches.at(-1) || null;
 }
 
-function stripLargeInvoiceImage(invoice) {
-  if (!invoice?.imageData) return invoice;
+function extractInvoiceMerchant(text) {
+  const line = text.split(/\n+/).map((value) => value.trim()).find((value) => value && !/rechnung|kassenbon|datum|summe|total/i.test(value));
+  return line || '';
+}
+
+function stripLargeBookkeepingFile(item) {
+  if (!item) return item;
   return {
-    ...invoice,
-    imageData: '[image data: ' + Math.round(invoice.imageData.length / 1024) + ' KB]'
+    ...item,
+    imageData: item.imageData ? '[image data: ' + Math.round(item.imageData.length / 1024) + ' KB]' : item.imageData,
+    fileData: item.fileData ? '[file data: ' + Math.round(item.fileData.length / 1024) + ' KB]' : item.fileData
   };
+}
+
+function buildBookkeepingExportHtml(items) {
+  const escapedJson = JSON.stringify(items).replace(/</g, '\\u003c');
+  return `<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buchhaltung Export</title>
+  <style>
+    :root { color-scheme: dark; --bg:#09090b; --panel:#18181b; --soft:#27272a; --ink:#f4f4f5; --muted:#a1a1aa; --line:#3f3f46; --cyan:#67e8f9; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Arial,Helvetica,sans-serif; line-height:1.5; }
+    header { position:sticky; top:0; z-index:5; border-bottom:1px solid var(--line); background:rgba(9,9,11,.92); padding:16px; backdrop-filter:blur(12px); }
+    main { max-width:1180px; margin:0 auto; padding:18px; }
+    h1 { margin:0; font-size:24px; }
+    .muted { color:var(--muted); }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+    input,select,button { min-height:38px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); padding:8px 10px; }
+    button { cursor:pointer; }
+    .grid { display:grid; gap:12px; }
+    .card { border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:14px; }
+    .item { display:grid; gap:12px; grid-template-columns:1fr auto; align-items:start; }
+    .tag { display:inline-flex; border-radius:999px; background:var(--soft); padding:3px 8px; font-size:12px; color:var(--cyan); margin-right:6px; }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+    pre { white-space:pre-wrap; overflow:auto; max-height:260px; background:#000; border-radius:6px; padding:10px; }
+    img.preview { max-width:100%; max-height:76vh; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#000; }
+    dialog { width:min(920px,94vw); border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
+    @media (max-width:760px) { .item { grid-template-columns:1fr; } .actions { justify-content:flex-start; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Buchhaltung Export</h1>
+    <div class="muted">Offline-Datei erstellt am ${escapeHtml(new Date().toLocaleString('de-AT'))}. Enthalten: Rechnungen, Angebote, Kategorien und eingebettete Dateien.</div>
+    <div class="toolbar">
+      <select id="type"><option value="all">Alles</option><option value="invoice">Rechnungen</option><option value="offer">Angebote</option></select>
+      <input id="search" placeholder="Suchen...">
+      <button onclick="window.print()">Drucken / PDF</button>
+      <button onclick="downloadJson()">JSON exportieren</button>
+    </div>
+  </header>
+  <main>
+    <div id="list" class="grid"></div>
+  </main>
+  <dialog id="viewer"><div class="actions"><button onclick="viewer.close()">Schliessen</button></div><div id="viewerBody"></div></dialog>
+  <script>
+    const records = ${escapedJson};
+    const list = document.getElementById('list');
+    const search = document.getElementById('search');
+    const type = document.getElementById('type');
+    const viewer = document.getElementById('viewer');
+    const viewerBody = document.getElementById('viewerBody');
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
+    }
+
+    function render() {
+      const needle = search.value.toLowerCase();
+      const selectedType = type.value;
+      const filtered = records.filter((record) => {
+        const recordType = record.recordType || 'invoice';
+        const haystack = JSON.stringify(record).toLowerCase();
+        return (selectedType === 'all' || recordType === selectedType) && haystack.includes(needle);
+      });
+      list.innerHTML = filtered.map((record, index) => {
+        const recordType = record.recordType === 'offer' ? 'Angebot' : 'Rechnung';
+        return '<article class="card item">' +
+          '<div><div><span class="tag">' + esc(recordType) + '</span><span class="tag">' + esc(record.category || 'Allgemein') + '</span></div>' +
+          '<h2>' + esc(record.title || record.merchant || recordType) + '</h2>' +
+          '<p class="muted">' + esc(record.date || 'Datum unbekannt') + (record.total ? ' - ' + esc(record.total) : '') + (record.merchant ? ' - ' + esc(record.merchant) : '') + '</p>' +
+          (record.validUntil ? '<p class="muted">Gueltig bis: ' + esc(record.validUntil) + '</p>' : '') +
+          (record.notes ? '<p>' + esc(record.notes) + '</p>' : '') +
+          '</div><div class="actions">' +
+          ((record.fileData || record.imageData) ? '<button onclick="openFile(' + index + ')">Datei oeffnen</button>' : '') +
+          '<button onclick="openJson(' + index + ')">JSON</button>' +
+          '</div></article>';
+      }).join('') || '<p class="muted">Keine Eintraege gefunden.</p>';
+    }
+
+    function openFile(index) {
+      const record = records[index];
+      const data = record.fileData || record.imageData;
+      if (!data) return;
+      if ((record.fileType || '').startsWith('image/')) {
+        viewerBody.innerHTML = '<img class="preview" src="' + data + '" alt="">';
+        viewer.showModal();
+      } else {
+        const win = window.open('', '_blank');
+        win.document.write('<iframe src="' + data + '" style="border:0;width:100vw;height:100vh"></iframe>');
+      }
+    }
+
+    function openJson(index) {
+      viewerBody.innerHTML = '<pre>' + esc(JSON.stringify(records[index], null, 2)) + '</pre>';
+      viewer.showModal();
+    }
+
+    function downloadJson() {
+      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'buchhaltung-export.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    search.addEventListener('input', render);
+    type.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[char]));
 }
 
 function Media({ api }) {
@@ -1781,7 +2078,7 @@ function App() {
   const pages = {
     dashboard: <Dashboard api={api} />,
     tasks: <TrelloWidget title="To-do" intro={false} />,
-    invoices: <Invoices api={api} />,
+    invoices: <BookkeepingPage />,
     media: <Media api={api} />,
     news: <News api={api} />,
     travel: <Travel api={api} />,
